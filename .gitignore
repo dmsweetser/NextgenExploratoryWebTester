@@ -4,3 +4,5 @@ instructions.txt
 venv
 ai_builder
 __pycache__
+llama.cpp/*
+prompt*.*
