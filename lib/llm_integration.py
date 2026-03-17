@@ -1,152 +1,131 @@
 import logging
+import subprocess
+import os
 from lib.config import Config
-from typing import Dict, Any, Optional
-import time
-from datetime import datetime
+
+class LLMFactory:
+    def create_llm(self):
+        if Config.use_local_model():
+            return LocalLlama()
+        else:
+            return AzureFoundry()
 
 class LocalLlama:
-    """Local Llama model integration"""
-
     def __init__(self):
-        self.model = None
-        self.initialize_model()
+        self.response_file = "response.log"
 
-    def initialize_model(self):
-        """Initialize the local Llama model"""
-        try:
-            from llama_cpp import Llama
-            model_path = Config.get_model_path()
-            if not model_path:
-                raise ValueError("MODEL_PATH not configured in config.py")
+    def get_action(self, prompt):
+        model_path = Config.get_model_path()
+        if not model_path:
+            raise ValueError("MODEL_PATH not configured")
 
-            self.model = Llama(
-                model_path=model_path,
-                n_ctx=Config.get_model_context(),
-                n_threads=Config.get_model_threads(),
-                n_batch=Config.get_model_batch(),
-                n_gpu_layers=Config.get_model_gpu_layers()
-            )
-        except ImportError:
-            logging.error("llama_cpp not installed. Please install with: pip install llama-cpp-python")
-            raise
-        except Exception as e:
-            logging.error(f"Failed to initialize local Llama model: {str(e)}")
-            raise
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        llama_binary = os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "llama-cli")
 
-    def get_action(self, prompt: str) -> Dict[str, Any]:
-        """Get the next action from the LLM"""
-        if not self.model:
-            raise RuntimeError("Model not initialized")
+        if not os.path.isfile(llama_binary):
+            raise FileNotFoundError(f"llama binary not found at: {llama_binary}")
+
+        cmd = [
+            llama_binary,
+            "-m", model_path,
+            "-p", prompt,
+            "--temp", str(Config.get_temperature()),
+            "--top-p", str(Config.get_top_p()),
+            "--top-k", str(Config.get_top_k()),
+            "--min-p", str(Config.get_min_p()),
+            "-n", str(Config.get_output_tokens()),
+            "--ctx-size", str(Config.get_model_context()),
+            "--no-display-prompt",
+            "-st"
+        ]
+
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
 
         response_content = ""
+        current_iteration = 0
+
+        while True:
+            token = process.stdout.read(1)
+            if current_iteration % 100 == 0 or not token:
+                with open(self.response_file, 'w', encoding='utf-8') as response_log:
+                    response_log.write(response_content)
+            if not token:
+                break
+            response_content += token
+            current_iteration += 1
+
+        process.wait()
+
         try:
-            # Generate response with streaming
-            for response in self.model(prompt, stream=True):
-                response_content += response['choices'][0]['text']
-
-            # Parse the JSON response
-            try:
-                import json
-                action = json.loads(response_content)
-                return action
-            except json.JSONDecodeError:
-                # Fallback if JSON parsing fails
-                return {
-                    "action": "click",
-                    "element": "body",
-                    "value": "",
-                    "reasoning": "Fallback action due to JSON parsing error"
-                }
-
-        except Exception as e:
-            logging.error(f"Error getting action from LLM: {str(e)}")
+            import json
+            return json.loads(response_content)
+        except json.JSONDecodeError:
             return {
                 "action": "wait",
                 "element": "",
                 "value": "2",
-                "reasoning": "Error in LLM, waiting to recover"
+                "reasoning": "Fallback action due to JSON parsing error"
             }
 
 class AzureFoundry:
-    """Azure Foundry model integration"""
-
     def __init__(self):
         self.client = None
         self.initialize_client()
 
     def initialize_client(self):
-        """Initialize the Azure Foundry client"""
+        from azure.ai.inference import ChatCompletionsClient
+        from azure.core.credentials import AzureKeyCredential
+
+        endpoint = Config.get_endpoint()
+        api_key = Config.get_api_key()
+        model_name = Config.get_model_name()
+
+        if not all([endpoint, api_key, model_name]):
+            raise ValueError("Missing Azure Foundry configuration")
+
+        self.client = ChatCompletionsClient(
+            endpoint=endpoint,
+            credential=AzureKeyCredential(api_key),
+            api_version="2024-05-01-preview"
+        )
+
+    def get_action(self, prompt):
+        from azure.ai.inference.models import SystemMessage, UserMessage
+
+        response = self.client.complete(
+            stream=True,
+            messages=[
+                SystemMessage(content="You are a helpful web testing assistant. Respond with JSON."),
+                UserMessage(content=prompt)
+            ],
+            max_tokens=Config.get_output_tokens(),
+            model=Config.get_model_name()
+        )
+
+        response_content = ""
+        for update in response:
+            if update.choices and isinstance(update.choices, list) and len(update.choices) > 0:
+                content = update.choices[0].get("delta", {}).get("content", "")
+                if content is not None:
+                    response_content += content
+            else:
+                break
+
+        response.close()
+
         try:
-            from azure.ai.inference import ChatCompletionsClient
-            from azure.core.credentials import AzureKeyCredential
-
-            endpoint = Config.get_endpoint()
-            api_key = Config.get_api_key()
-            model_name = Config.get_model_name()
-
-            if not all([endpoint, api_key, model_name]):
-                raise ValueError("Missing Azure Foundry configuration in config.py")
-
-            self.client = ChatCompletionsClient(
-                endpoint=endpoint,
-                credential=AzureKeyCredential(api_key),
-                api_version="2024-05-01-preview"
-            )
-        except ImportError:
-            logging.error("azure-ai-inference not installed. Please install with: pip install azure-ai-inference")
-            raise
-        except Exception as e:
-            logging.error(f"Failed to initialize Azure Foundry client: {str(e)}")
-            raise
-
-    def get_action(self, prompt: str) -> Dict[str, Any]:
-        """Get the next action from the Azure Foundry model"""
-        if not self.client:
-            raise RuntimeError("Client not initialized")
-
-        try:
-            from azure.ai.inference.models import SystemMessage, UserMessage
-
-            response = self.client.complete(
-                stream=True,
-                messages=[
-                    SystemMessage(content="You are a helpful web testing assistant. Respond with JSON."),
-                    UserMessage(content=prompt)
-                ],
-                max_tokens=Config.get_output_tokens(),
-                model=Config.get_model_name()
-            )
-
-            response_content = ""
-            for update in response:
-                if update.choices and isinstance(update.choices, list) and len(update.choices) > 0:
-                    content = update.choices[0].get("delta", {}).get("content", "")
-                    if content is not None:
-                        response_content += content
-                else:
-                    break
-
-            response.close()
-
-            # Parse the JSON response
-            try:
-                import json
-                action = json.loads(response_content)
-                return action
-            except json.JSONDecodeError:
-                # Fallback if JSON parsing fails
-                return {
-                    "action": "click",
-                    "element": "body",
-                    "value": "",
-                    "reasoning": "Fallback action due to JSON parsing error"
-                }
-
-        except Exception as e:
-            logging.error(f"Error getting action from Azure Foundry: {str(e)}")
+            import json
+            return json.loads(response_content)
+        except json.JSONDecodeError:
             return {
                 "action": "wait",
                 "element": "",
                 "value": "2",
-                "reasoning": "Error in Azure Foundry, waiting to recover"
+                "reasoning": "Fallback action due to JSON parsing error"
             }

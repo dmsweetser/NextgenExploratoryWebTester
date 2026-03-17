@@ -2,9 +2,9 @@ azure-ai-projects
 azure-identity
 azure-ai-inference
 dotenv
-llama-cpp-python
-flask 
-selenium 
-beautifulsoup4 
-pdfkit 
+flask
+selenium
+beautifulsoup4
+pdfkit
 python-dotenv
+psutil

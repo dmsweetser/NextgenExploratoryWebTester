@@ -43,5 +43,27 @@ if %errorlevel% neq 0 (
 
 echo Required Python packages installed successfully.
 
+echo Installing llama.cpp with CMake...
+
+if not exist llama.cpp (
+    git clone https://github.com/ggerganov/llama.cpp
+) else (
+    cd llama.cpp
+    git pull
+    cd ..
+)
+
+cd llama.cpp
+mkdir build
+cd build
+
+cmake ..
+cmake --build . --config Release -j%NUMBER_OF_PROCESSORS%
+
+cd ..\..
+
+echo llama.cpp built successfully.
+echo Binary located at: llama.cpp\build\bin\llama-cli
+
 echo Environment setup complete.
 echo To activate the virtual environment, run: venv\Scripts\Activate
