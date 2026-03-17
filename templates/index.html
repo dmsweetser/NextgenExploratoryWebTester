@@ -78,23 +78,23 @@
 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <i class="bi bi-robot"></i> Active Bots
+                        <i class="bi bi-robot"></i> Active EWT Bots
                     </div>
                     <div class="card-body">
-                        <p class="text-muted">No active bots at the moment.</p>
+                        <p class="text-muted">No active EWT bots at the moment.</p>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <i class="bi bi-clock-history"></i> Bot History
+                        <i class="bi bi-clock-history"></i> EWT Test History
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Name</th>
+                                        <th>EWT Bot Name</th>
                                         <th>Start URL</th>
                                         <th>Status</th>
                                         <th>Last Activity</th>
@@ -114,7 +114,7 @@
                                         <td>{{ bot[5] }}</td>
                                         <td>
                                             <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> View
+                                                <i class="bi bi-eye"></i> View EWT Results
                                             </a>
                                         </td>
                                     </tr>

@@ -59,7 +59,7 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h5><i class="bi bi-info-circle"></i> Bot Information</h5>
+                                <h5><i class="bi bi-info-circle"></i> EWT Bot Information</h5>
                                 <table class="table table-borderless">
                                     <tr>
                                         <th width="30%">Status:</th>
@@ -93,7 +93,7 @@
 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <i class="bi bi-list-ul"></i> Execution Steps
+                        <i class="bi bi-list-ul"></i> EWT Execution Steps
                     </div>
                     <div class="card-body">
                         {% if steps %}
@@ -105,21 +105,21 @@
                                     <h6 class="timeline-title">{{ step[3] }}</h6>
                                     <p class="timeline-time">{{ step[6] }}</p>
                                     {% if step[5] %}
-                                    <img src="{{ url_for('static', filename=step[5].replace('uploads/', '')) }}" class="img-thumbnail" alt="Step screenshot">
+                                    <img src="{{ url_for('static', filename=step[5].replace('uploads/', '')) }}" class="img-thumbnail" alt="EWT step screenshot">
                                     {% endif %}
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-muted">No steps recorded yet.</p>
+                        <p class="text-muted">No EWT steps recorded yet.</p>
                         {% endif %}
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <i class="bi bi-bug"></i> Bugs Found
+                        <i class="bi bi-bug"></i> EWT Bugs Found
                     </div>
                     <div class="card-body">
                         {% if bugs %}
@@ -143,7 +143,7 @@
                                         </td>
                                         <td>
                                             <a href="{{ url_for('export_bug', bug_id=bug[0]) }}" class="btn btn-sm btn-outline-secondary">
-                                                <i class="bi bi-download"></i> Export
+                                                <i class="bi bi-download"></i> Export EWT Report
                                             </a>
                                             {% if bug[6] != 'resolved' %}
                                             <form action="{{ url_for('resolve_bug', bug_id=bug[0]) }}" method="post" style="display: inline;">
@@ -159,7 +159,7 @@
                             </table>
                         </div>
                         {% else %}
-                        <p class="text-muted">No bugs found yet.</p>
+                        <p class="text-muted">No EWT bugs found yet.</p>
                         {% endif %}
                     </div>
                 </div>

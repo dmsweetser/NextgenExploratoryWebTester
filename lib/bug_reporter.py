@@ -5,19 +5,21 @@ import logging
 from lib.config import Config
 
 class BugReporter:
-    def send_notification(self, summary, knowledge):
+    def send_notification(self, summary, knowledge, severity="medium"):
         if not Config.get_smtp_host():
             return
 
         msg = MIMEMultipart()
         msg['From'] = Config.get_smtp_from()
         msg['To'] = Config.get_bug_notification_emails()
-        msg['Subject'] = f"New Bug Found: {summary}"
+        msg['Subject'] = f"[EWT] New Bug Found ({severity.upper()} Severity): {summary}"
 
         body = f"""
-        A new bug has been found by the bot system.
+        A new bug has been found by the EWT (Exploratory Web Tester) system.
 
         Summary: {summary}
+
+        Severity: {severity.upper()}
 
         Knowledge about this bug:
         {knowledge}

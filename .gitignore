@@ -3,3 +3,4 @@ pre.ps1
 instructions.txt
 venv
 ai_builder
+__pycache__

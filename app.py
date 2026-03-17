@@ -99,14 +99,14 @@ def stop_bot(bot_id):
 @app.route('/self-test', methods=['POST'])
 def run_self_test():
     bot_id = db.create_bot(
-        name='Self-Test Bot',
+        name='EWT Self-Test Bot',
         start_url='http://localhost:5000/test-website',
-        directive='Test this dummy website and find any bugs'
+        directive='Test this dummy website and find any bugs using EWT'
     )
     bot_thread = BotThread(
         bot_id=bot_id,
         start_url='http://localhost:5000/test-website',
-        directive='Test this dummy website and find any bugs',
+        directive='Test this dummy website and find any bugs using EWT',
         db=db,
         bot_manager=bot_manager,
         bug_reporter=bug_reporter,

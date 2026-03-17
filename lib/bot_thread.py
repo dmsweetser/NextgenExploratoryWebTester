@@ -169,29 +169,72 @@ class BotThread(threading.Thread):
             return {'success': False, 'screenshot': screenshot_path}
 
     def detect_bug(self, action, result):
-        page_source = self.driver.page_source.lower()
-        return any(keyword in page_source for keyword in ['error', 'exception', 'problem', 'failed', 'not found'])
+        prompt = f"""
+        Analyze the following page content and determine if there's a bug based on the previous action: {action['action']} {action.get('element', '')}
 
-    def report_bug(self, action, result, context):
-        summary = f"Potential error detected after action: {action['action']} {action.get('element', '')}"
+        Page content:
+        {self.driver.page_source[:2000]}
+
+        Consider:
+        1. Any error messages, exceptions, or malfunctions
+        2. Logical blocking - elements that should be interactive but aren't
+        3. Typos or incorrect text that indicates a problem
+        4. Unexpected page states or behaviors
+
+        Respond with JSON containing:
+        - "is_bug": boolean indicating if this is a bug
+        - "severity": "high", "medium", or "low"
+        - "description": detailed explanation of why this is a bug
+        - "recommendation": how to fix or work around this bug
+        """
+
+        analysis = self.llm.get_action(prompt)
+        return analysis.get('is_bug', False), analysis
+
+    def report_bug(self, action, result, context, analysis):
+        summary = f"EWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
         bug_id = self.db.add_bug(self.bot_id, summary, steps, result['screenshot'])
 
         knowledge_prompt = f"""
-        The following error occurred while trying to {action['action']} element {action.get('element', '')}:
-        {self.driver.page_source[:1000]}
+        The EWT bot detected a bug after attempting to {action['action']} element {action.get('element', '')}.
+        The page content was: {self.driver.page_source[:1000]}
 
-        Provide a concise summary of what went wrong and how to avoid it in the future.
+        The analysis indicates:
+        - Severity: {analysis['severity']}
+        - Description: {analysis['description']}
+        - Recommendation: {analysis['recommendation']}
+
+        Provide a concise technical summary of what went wrong and how to avoid similar issues in the future.
         """
         knowledge = self.llm.get_action(knowledge_prompt)['reasoning']
         self.db.add_knowledge(bug_id, knowledge)
 
-        self.bug_reporter.send_notification(summary, knowledge)
+        self.bug_reporter.send_notification(summary, knowledge, analysis['severity'])
         return bug_id
 
     def is_directive_complete(self):
-        page_source = self.driver.page_source.lower()
-        return any(keyword in page_source for keyword in ['success', 'completed', 'done', 'finished'])
+        prompt = f"""
+        Based on the current page content and the EWT bot's directive, determine if the testing is complete.
+
+        Current directive: {self.directive}
+        Current page content: {self.driver.page_source[:2000]}
+        Steps taken so far: {json.dumps([{'step': s['step'], 'action': s['action'], 'element': s.get('element', '')} for s in steps_taken])}
+
+        Consider:
+        1. Has the directive been fully satisfied?
+        2. Are there any remaining interactive elements that need testing?
+        3. Is there any indication that testing should continue?
+        4. Have all major functionality areas been covered?
+
+        Respond with JSON containing:
+        - "complete": boolean indicating if testing is complete
+        - "reasoning": detailed explanation of why testing should continue or stop
+        - "next_area": if not complete, suggest the next area to test
+        """
+
+        completion_check = self.llm.get_action(prompt)
+        return completion_check.get('complete', False)
 
     def is_same_domain(self, url1, url2):
         from urllib.parse import urlparse
