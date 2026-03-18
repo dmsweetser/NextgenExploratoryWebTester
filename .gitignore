@@ -7,3 +7,4 @@ __pycache__
 llama.cpp/*
 prompt*.*
 bots.db
+.env
