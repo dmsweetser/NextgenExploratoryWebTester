@@ -112,7 +112,8 @@ def run_self_test():
         bug_reporter=bug_reporter,
         html_simplifier=html_simplifier,
         screenshot_capturer=screenshot_capturer,
-        llm_factory=LLMFactory()
+        llm_factory=LLMFactory(),
+        steps_taken=[]
     )
     bot_thread.start()
     bot_manager.add_bot(bot_thread)

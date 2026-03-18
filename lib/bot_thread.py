@@ -13,7 +13,7 @@ from lib.config import Config
 from lib.llm_integration import LLMFactory
 
 class BotThread(threading.Thread):
-    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory):
+    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, steps_taken=None):
         threading.Thread.__init__(self)
         self.bot_id = bot_id
         self.start_url = start_url
@@ -27,6 +27,7 @@ class BotThread(threading.Thread):
         self.stop_event = threading.Event()
         self.llm = None
         self.driver = None
+        self.steps_taken = steps_taken or []
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -56,7 +57,7 @@ class BotThread(threading.Thread):
                     'directive': self.directive,
                     'current_page': simplified_html,
                     'known_bugs': known_bugs,
-                    'steps_taken': steps_taken,
+                    'steps_taken': self.steps_taken,
                     'current_url': current_url
                 }
 
@@ -169,11 +170,12 @@ class BotThread(threading.Thread):
             return {'success': False, 'screenshot': screenshot_path}
 
     def detect_bug(self, action, result):
+        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         prompt = f"""
         Analyze the following page content and determine if there's a bug based on the previous action: {action['action']} {action.get('element', '')}
 
         Page content:
-        {self.driver.page_source[:2000]}
+        {simplified_html}
 
         Consider:
         1. Any error messages, exceptions, or malfunctions
@@ -196,9 +198,10 @@ class BotThread(threading.Thread):
         steps = json.dumps(context['steps_taken'])
         bug_id = self.db.add_bug(self.bot_id, summary, steps, result['screenshot'])
 
+        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         knowledge_prompt = f"""
         The EWT bot detected a bug after attempting to {action['action']} element {action.get('element', '')}.
-        The page content was: {self.driver.page_source[:1000]}
+        The page content was: {simplified_html}
 
         The analysis indicates:
         - Severity: {analysis['severity']}
@@ -214,12 +217,13 @@ class BotThread(threading.Thread):
         return bug_id
 
     def is_directive_complete(self):
+        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         prompt = f"""
         Based on the current page content and the EWT bot's directive, determine if the testing is complete.
 
         Current directive: {self.directive}
-        Current page content: {self.driver.page_source[:2000]}
-        Steps taken so far: {json.dumps([{'step': s['step'], 'action': s['action'], 'element': s.get('element', '')} for s in steps_taken])}
+        Current page content: {simplified_html}
+        Steps taken so far: {json.dumps([{'step': s['step'], 'action': s['action'], 'element': s.get('element', '')} for s in self.steps_taken])}
 
         Consider:
         1. Has the directive been fully satisfied?
