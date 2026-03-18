@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import os
+import time
 from lib.config import Config
 
 class LLMFactory:
@@ -20,15 +21,20 @@ class LocalLlama:
             raise ValueError("MODEL_PATH not configured")
 
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        llama_binary = os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "llama-cli")
+        llama_binary = os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "llama-completion")
 
         if not os.path.isfile(llama_binary):
             raise FileNotFoundError(f"llama binary not found at: {llama_binary}")
 
+        ticks = int(time.time() * 1000)
+        filename = f"prompt_{ticks}.txt"
+        with open(filename, "w") as f:
+            f.write(prompt)
+
         cmd = [
             llama_binary,
             "-m", model_path,
-            "-p", prompt,
+            "-f", filename,
             "--temp", str(Config.get_temperature()),
             "--top-p", str(Config.get_top_p()),
             "--top-k", str(Config.get_top_k()),
@@ -56,10 +62,10 @@ class LocalLlama:
                 with open(self.response_file, 'w', encoding='utf-8') as response_log:
                     response_log.write(response_content)
             if not token:
+                os.remove(filename)
                 break
             response_content += token
             current_iteration += 1
-
         process.wait()
 
         try:

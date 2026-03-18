@@ -1,0 +1,45 @@
+2026-03-18 16:37:42,601 - __main__ - INFO - NEWT application initialized
+2026-03-18 16:37:42,620 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.12.165:5000
+2026-03-18 16:37:42,620 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-03-18 16:37:42,621 - werkzeug - INFO -  * Restarting with stat
+2026-03-18 16:37:43,605 - __main__ - INFO - NEWT application initialized
+2026-03-18 16:37:43,625 - werkzeug - WARNING -  * Debugger is active!
+2026-03-18 16:37:43,626 - werkzeug - INFO -  * Debugger PIN: 294-101-584
+2026-03-18 16:38:18,119 - werkzeug - INFO -  * Detected change in '/home/daniel/Files/source/repos/ExploratoryWebTester/lib/bot_thread.py', reloading
+2026-03-18 16:38:23,843 - werkzeug - INFO -  * Restarting with stat
+2026-03-18 16:38:24,799 - __main__ - INFO - NEWT application initialized
+2026-03-18 16:38:24,819 - werkzeug - WARNING -  * Debugger is active!
+2026-03-18 16:38:24,820 - werkzeug - INFO -  * Debugger PIN: 294-101-584
+2026-03-18 16:38:34,945 - werkzeug - INFO -  * Detected change in '/home/daniel/Files/source/repos/ExploratoryWebTester/lib/bug_reporter.py', reloading
+2026-03-18 16:39:41,406 - __main__ - INFO - NEWT application initialized
+2026-03-18 16:39:41,422 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.12.165:5000
+2026-03-18 16:39:41,423 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-03-18 16:39:41,423 - werkzeug - INFO -  * Restarting with stat
+2026-03-18 16:39:42,397 - __main__ - INFO - NEWT application initialized
+2026-03-18 16:39:42,417 - werkzeug - WARNING -  * Debugger is active!
+2026-03-18 16:39:42,419 - werkzeug - INFO -  * Debugger PIN: 294-101-584
+2026-03-18 16:39:46,313 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:39:46] "GET / HTTP/1.1" 200 -
+2026-03-18 16:39:46,528 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:39:46] "GET /static/css/style.css HTTP/1.1" 200 -
+2026-03-18 16:39:46,528 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:39:46] "GET /static/js/main.js HTTP/1.1" 200 -
+2026-03-18 16:39:47,994 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:39:47] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-03-18 16:39:59,303 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:39:59] "GET /create HTTP/1.1" 200 -
+2026-03-18 16:39:59,336 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:39:59] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-03-18 16:39:59,339 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:39:59] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2026-03-18 16:40:01,125 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:01] "GET /create HTTP/1.1" 200 -
+2026-03-18 16:40:01,145 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:01] "GET /static/css/style.css HTTP/1.1" 200 -
+2026-03-18 16:40:01,148 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:01] "GET /static/js/main.js HTTP/1.1" 200 -
+2026-03-18 16:40:04,679 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:04] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-03-18 16:40:06,619 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:06] "GET / HTTP/1.1" 200 -
+2026-03-18 16:40:06,650 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:06] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-03-18 16:40:06,654 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:06] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+2026-03-18 16:40:09,655 - __main__ - INFO - Self-test bot 1 started
+2026-03-18 16:40:09,656 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:09] "[32mPOST /self-test HTTP/1.1[0m" 302 -
+2026-03-18 16:40:09,689 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:09] "GET /bot/1 HTTP/1.1" 200 -
+2026-03-18 16:40:09,736 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:09] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-03-18 16:40:09,739 - werkzeug - INFO - 127.0.0.1 - - [18/Mar/2026 16:40:09] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -

@@ -15,6 +15,17 @@ from lib.database import Database
 from lib.html_simplifier import HTMLSimplifier
 from lib.screenshot_capturer import ScreenshotCapturer
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('newt.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
@@ -25,6 +36,7 @@ bot_manager = BotManager()
 bug_reporter = BugReporter()
 html_simplifier = HTMLSimplifier()
 screenshot_capturer = ScreenshotCapturer(app.config['UPLOAD_FOLDER'])
+logger.info("NEWT application initialized")
 
 @app.route('/')
 def index():
@@ -48,7 +60,8 @@ def create_bot():
             bug_reporter=bug_reporter,
             html_simplifier=html_simplifier,
             screenshot_capturer=screenshot_capturer,
-            llm_factory=LLMFactory()
+            llm_factory=LLMFactory(),
+            logger=logger
         )
         bot_thread.start()
         bot_manager.add_bot(bot_thread)
@@ -99,24 +112,26 @@ def stop_bot(bot_id):
 @app.route('/self-test', methods=['POST'])
 def run_self_test():
     bot_id = db.create_bot(
-        name='EWT Self-Test Bot',
+        name='NEWT Self-Test Bot',
         start_url='http://localhost:5000/test-website',
-        directive='Test this dummy website and find any bugs using EWT'
+        directive='Test this dummy website and find any bugs using NEWT'
     )
     bot_thread = BotThread(
         bot_id=bot_id,
         start_url='http://localhost:5000/test-website',
-        directive='Test this dummy website and find any bugs using EWT',
+        directive='Test this dummy website and find any bugs using NEWT',
         db=db,
         bot_manager=bot_manager,
         bug_reporter=bug_reporter,
         html_simplifier=html_simplifier,
         screenshot_capturer=screenshot_capturer,
         llm_factory=LLMFactory(),
+        logger=logger,
         steps_taken=[]
     )
     bot_thread.start()
     bot_manager.add_bot(bot_thread)
+    logger.info(f"Self-test bot {bot_id} started")
     return redirect(url_for('bot', bot_id=bot_id))
 
 @app.route('/test-website')

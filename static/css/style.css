@@ -25,12 +25,14 @@ body {
 .main-content {
     margin-left: 240px;
     padding: 20px;
+    overflow-x: hidden;
 }
 
 @media (max-width: 767.98px) {
     .main-content {
         margin-left: 0;
         padding: 20px;
+        overflow-x: hidden;
     }
 }
 

@@ -50,21 +50,21 @@
                     <div class="card-body">
                         <form method="POST" action="{{ url_for('create_bot') }}">
                             <div class="mb-3">
-                                <label for="name" class="form-label">EWT Bot Name</label>
+                                <label for="name" class="form-label">NEWT Bot Name</label>
                                 <input type="text" class="form-control" id="name" name="name" required>
                             </div>
                             <div class="mb-3">
                                 <label for="start_url" class="form-label">Start URL</label>
                                 <input type="url" class="form-control" id="start_url" name="start_url" required>
-                                <div class="form-text">The website URL where the EWT bot should start testing</div>
+                                <div class="form-text">The website URL where the NEWT bot should start testing</div>
                             </div>
                             <div class="mb-3">
-                                <label for="directive" class="form-label">EWT Testing Directive</label>
+                                <label for="directive" class="form-label">NEWT Testing Directive</label>
                                 <textarea class="form-control" id="directive" name="directive" rows="5" required></textarea>
-                                <div class="form-text">Describe what the EWT bot should test and what it should look for</div>
+                                <div class="form-text">Describe what the NEWT bot should test and what it should look for</div>
                             </div>
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-robot"></i> Create and Start EWT Bot
+                                <i class="bi bi-robot"></i> Create and Start NEWT Bot
                             </button>
                         </form>
                     </div>

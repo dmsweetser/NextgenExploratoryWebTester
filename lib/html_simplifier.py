@@ -42,4 +42,9 @@ class HTMLSimplifier:
             # Add data attribute for all options (will be retrieved on demand)
             select_tag['data-has-options'] = 'true'
 
-        return str(soup)
+        # Convert HTML to text and remove excessive whitespace
+        simplified_html = str(soup)
+        simplified_html = ' '.join(simplified_html.split())
+        simplified_html = simplified_html.replace('<', '').replace('>', '')
+
+        return simplified_html

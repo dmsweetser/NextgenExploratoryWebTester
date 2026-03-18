@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Testing Bot - Dashboard</title>
+    <title>NEWT - Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
@@ -14,7 +14,7 @@
             <nav class="col-md-2 d-none d-md-block bg-light sidebar">
                 <div class="sidebar-sticky">
                     <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                        <span>Web Testing Bot</span>
+                        <span>NEWT - Next-gen Exploratory Web Tester</span>
                     </h6>
                     <ul class="nav flex-column">
                         <li class="nav-item">
@@ -78,23 +78,23 @@
 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <i class="bi bi-robot"></i> Active EWT Bots
+                        <i class="bi bi-robot"></i> Active NEWT Bots
                     </div>
                     <div class="card-body">
-                        <p class="text-muted">No active EWT bots at the moment.</p>
+                        <p class="text-muted">No active NEWT bots at the moment.</p>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <i class="bi bi-clock-history"></i> EWT Test History
+                        <i class="bi bi-clock-history"></i> NEWT Test History
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>EWT Bot Name</th>
+                                        <th>NEWT Bot Name</th>
                                         <th>Start URL</th>
                                         <th>Status</th>
                                         <th>Last Activity</th>
@@ -114,7 +114,7 @@
                                         <td>{{ bot[5] }}</td>
                                         <td>
                                             <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> View EWT Results
+                                                <i class="bi bi-eye"></i> View NEWT Results
                                             </a>
                                         </td>
                                     </tr>

@@ -12,10 +12,10 @@ class BugReporter:
         msg = MIMEMultipart()
         msg['From'] = Config.get_smtp_from()
         msg['To'] = Config.get_bug_notification_emails()
-        msg['Subject'] = f"[EWT] New Bug Found ({severity.upper()} Severity): {summary}"
+        msg['Subject'] = f"[NEWT] New Bug Found ({severity.upper()} Severity): {summary}"
 
         body = f"""
-        A new bug has been found by the EWT (Exploratory Web Tester) system.
+        A new bug has been found by the NEWT (Next-gen Exploratory Web Tester) system.
 
         Summary: {summary}
 

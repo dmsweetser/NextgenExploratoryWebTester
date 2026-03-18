@@ -13,7 +13,7 @@ from lib.config import Config
 from lib.llm_integration import LLMFactory
 
 class BotThread(threading.Thread):
-    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, steps_taken=None):
+    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None):
         threading.Thread.__init__(self)
         self.bot_id = bot_id
         self.start_url = start_url
@@ -28,6 +28,7 @@ class BotThread(threading.Thread):
         self.llm = None
         self.driver = None
         self.steps_taken = steps_taken or []
+        self.logger = logger
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -160,11 +161,12 @@ class BotThread(threading.Thread):
 
             screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}.png")
             self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), screenshot_path)
+            self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
             return {'success': True, 'screenshot': screenshot_path}
 
         except Exception as e:
             error_msg = f"Failed to {action['action']} element {action.get('element', '')}: {str(e)}"
-            logging.error(error_msg)
+            self.logger.error(error_msg, exc_info=True)
             screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}.png")
             self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), screenshot_path)
             return {'success': False, 'screenshot': screenshot_path}
@@ -194,13 +196,13 @@ class BotThread(threading.Thread):
         return analysis.get('is_bug', False), analysis
 
     def report_bug(self, action, result, context, analysis):
-        summary = f"EWT Bug Detected: {analysis['description']}"
+        summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
         bug_id = self.db.add_bug(self.bot_id, summary, steps, result['screenshot'])
 
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         knowledge_prompt = f"""
-        The EWT bot detected a bug after attempting to {action['action']} element {action.get('element', '')}.
+        The NEWT bot detected a bug after attempting to {action['action']} element {action.get('element', '')}.
         The page content was: {simplified_html}
 
         The analysis indicates:
@@ -219,7 +221,7 @@ class BotThread(threading.Thread):
     def is_directive_complete(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         prompt = f"""
-        Based on the current page content and the EWT bot's directive, determine if the testing is complete.
+        Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
         Current directive: {self.directive}
         Current page content: {simplified_html}
@@ -249,5 +251,7 @@ class BotThread(threading.Thread):
     def cleanup(self):
         if self.driver:
             self.driver.quit()
+            self.logger.info(f"Bot {self.bot_id} driver closed")
         self.db.update_bot_status(self.bot_id, 'completed', datetime.now().isoformat())
         self.bot_manager.remove_bot(self.bot_id)
+        self.logger.info(f"Bot {self.bot_id} completed and removed from manager")
