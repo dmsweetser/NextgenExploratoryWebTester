@@ -77,8 +77,9 @@ class BotThread(threading.Thread):
                     step_number += 1
 
                     # Check for bugs
-                    if self.detect_bug(action, result):
-                        bug_id = self.report_bug(action, result, context)
+                    analysis_result, analysis = self.detect_bug(action, result)
+                    if analysis_result:
+                        bug_id = self.report_bug(action, result, context, analysis)
                         known_bugs.append(self.db.get_knowledge_for_bug(bug_id))
 
                     # Update simplified HTML
@@ -212,10 +213,11 @@ class BotThread(threading.Thread):
 
         Provide a concise technical summary of what went wrong and how to avoid similar issues in the future.
         """
-        knowledge = self.llm.get_action(knowledge_prompt)['reasoning']
+        knowledge_response = self.llm.get_action(knowledge_prompt)
+        knowledge = knowledge_response.get('reasoning', 'No additional knowledge provided')
         self.db.add_knowledge(bug_id, knowledge)
 
-        self.bug_reporter.send_notification(summary, knowledge, analysis['severity'])
+        self.bug_reporter.send_notification(summary, knowledge, analysis.get('severity', 'medium'))
         return bug_id
 
     def is_directive_complete(self):

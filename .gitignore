@@ -10,3 +10,4 @@ bots.db
 .env
 newt.log
 response.log
+llama.cpp

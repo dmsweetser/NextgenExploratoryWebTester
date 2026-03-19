@@ -139,15 +139,19 @@ def test_website():
     return render_template('test_website.html')
 
 def generate_pdf(html_content):
-    import pdfkit
-    options = {
-        'page-size': 'A4',
-        'margin-top': '0.75in',
-        'margin-right': '0.75in',
-        'margin-bottom': '0.75in',
-        'margin-left': '0.75in',
-    }
-    return pdfkit.from_string(html_content, False, options=options)
+    try:
+        import pdfkit
+        options = {
+            'page-size': 'A4',
+            'margin-top': '0.75in',
+            'margin-right': '0.75in',
+            'margin-bottom': '0.75in',
+            'margin-left': '0.75in',
+        }
+        return pdfkit.from_string(html_content, False, options=options)
+    except Exception as e:
+        logger.error(f"Error generating PDF: {str(e)}")
+        raise
 
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):

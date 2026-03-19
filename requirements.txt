@@ -8,3 +8,4 @@ beautifulsoup4
 pdfkit
 python-dotenv
 psutil
+werkzeug

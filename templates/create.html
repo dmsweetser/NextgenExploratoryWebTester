@@ -1,80 +1,32 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Testing Bot - Create New Bot</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <nav class="col-md-2 d-none d-md-block bg-light sidebar">
-                <div class="sidebar-sticky">
-                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                        <span>NEWT - Next-gen Exploratory Web Tester</span>
-                        <br/>
-                    </h6>
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('index') }}">
-                                <i class="bi bi-house"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="{{ url_for('create_bot') }}">
-                                <i class="bi bi-robot"></i> Create Bot
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('bugs') }}">
-                                <i class="bi bi-bug"></i> Bugs
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#selfTestModal">
-                                <i class="bi bi-check2-circle"></i> Self Test
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
+{% extends "layout.html" %}
 
-            <main role="main" class="main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Create New Bot</h1>
-                </div>
-
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST" action="{{ url_for('create_bot') }}">
-                            <div class="mb-3">
-                                <label for="name" class="form-label">NEWT Bot Name</label>
-                                <input type="text" class="form-control" id="name" name="name" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="start_url" class="form-label">Start URL</label>
-                                <input type="url" class="form-control" id="start_url" name="start_url" required>
-                                <div class="form-text">The website URL where the NEWT bot should start testing</div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="directive" class="form-label">NEWT Testing Directive</label>
-                                <textarea class="form-control" id="directive" name="directive" rows="5" required></textarea>
-                                <div class="form-text">Describe what the NEWT bot should test and what it should look for</div>
-                            </div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-robot"></i> Create and Start NEWT Bot
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </main>
-        </div>
+{% block title %}Web Testing Bot - Create New Bot{% endblock %}
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Create New Bot</h1>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('create_bot') }}">
+                <div class="mb-3">
+                    <label for="name" class="form-label">NEWT Bot Name</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="start_url" class="form-label">Start URL</label>
+                    <input type="url" class="form-control" id="start_url" name="start_url" required>
+                    <div class="form-text">The website URL where the NEWT bot should start testing</div>
+                </div>
+                <div class="mb-3">
+                    <label for="directive" class="form-label">NEWT Testing Directive</label>
+                    <textarea class="form-control" id="directive" name="directive" rows="5" required></textarea>
+                    <div class="form-text">Describe what the NEWT bot should test and what it should look for</div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-robot"></i> Create and Start NEWT Bot
+                </button>
+            </form>
+        </div>
+    </div>
+{% endblock %}

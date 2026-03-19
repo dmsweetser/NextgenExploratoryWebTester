@@ -1,157 +1,88 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEWT - Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <nav class="col-md-2 d-none d-md-block bg-light sidebar">
-                <div class="sidebar-sticky">
-                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                        <span>NEWT - Next-gen Exploratory Web Tester</span>
-                        <br/>
-                    </h6>
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="{{ url_for('index') }}">
-                                <i class="bi bi-house"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('create_bot') }}">
-                                <i class="bi bi-robot"></i> Create Bot
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('bugs') }}">
-                                <i class="bi bi-bug"></i> Bugs
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#selfTestModal">
-                                <i class="bi bi-check2-circle"></i> Self Test
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
+{% extends "layout.html" %}
 
-            <main role="main" class="main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <div class="card text-white bg-primary mb-3">
-                            <div class="card-header">Active Bots</div>
-                            <div class="card-body">
-                                <h5 class="card-title">0</h5>
-                                <p class="card-text">Currently running bots</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card text-white bg-success mb-3">
-                            <div class="card-header">Completed Bots</div>
-                            <div class="card-body">
-                                <h5 class="card-title">{{ bots|length }}</h5>
-                                <p class="card-text">Total bots completed</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card text-white bg-warning mb-3">
-                            <div class="card-header">Bugs Found</div>
-                            <div class="card-body">
-                                <h5 class="card-title">0</h5>
-                                <p class="card-text">Total bugs reported</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <i class="bi bi-robot"></i> Active NEWT Bots
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted">No active NEWT bots at the moment.</p>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <i class="bi bi-clock-history"></i> NEWT Test History
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>NEWT Bot Name</th>
-                                        <th>Start URL</th>
-                                        <th>Status</th>
-                                        <th>Last Activity</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for bot in bots %}
-                                    <tr>
-                                        <td>{{ bot[1] }}</td>
-                                        <td><a href="{{ bot[2] }}" target="_blank" class="text-decoration-none">{{ bot[2] }}</a></td>
-                                        <td>
-                                            <span class="badge bg-{% if bot[4] == 'completed' %}success{% elif bot[4] == 'running' %}primary{% else %}secondary{% endif %}">
-                                                {{ bot[4] }}
-                                            </span>
-                                        </td>
-                                        <td>{{ bot[5] }}</td>
-                                        <td>
-                                            <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> View NEWT Results
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
+{% block title %}NEWT - Dashboard{% endblock %}
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Dashboard</h1>
     </div>
 
-    <!-- Self Test Modal -->
-    <div class="modal fade" id="selfTestModal" tabindex="-1" aria-labelledby="selfTestModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="selfTestModalLabel">Run Self Test</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-header">Active Bots</div>
+                <div class="card-body">
+                    <h5 class="card-title">0</h5>
+                    <p class="card-text">Currently running bots</p>
                 </div>
-                <div class="modal-body">
-                    <p>This will create a test bot that navigates through a dummy website to verify the system is working correctly.</p>
-                    <p>The test website contains a known bug that the bot should be able to detect.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-header">Completed Bots</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ bots|length }}</h5>
+                    <p class="card-text">Total bots completed</p>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <form action="{{ url_for('run_self_test') }}" method="post">
-                        <button type="submit" class="btn btn-primary">Run Self Test</button>
-                    </form>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-header">Bugs Found</div>
+                <div class="card-body">
+                    <h5 class="card-title">0</h5>
+                    <p class="card-text">Total bugs reported</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-robot"></i> Active NEWT Bots
+        </div>
+        <div class="card-body">
+            <p class="text-muted">No active NEWT bots at the moment.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-clock-history"></i> NEWT Test History
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>NEWT Bot Name</th>
+                            <th>Start URL</th>
+                            <th>Status</th>
+                            <th>Last Activity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bot in bots %}
+                        <tr>
+                            <td>{{ bot[1] }}</td>
+                            <td><a href="{{ bot[2] }}" target="_blank" class="text-decoration-none">{{ bot[2] }}</a></td>
+                            <td>
+                                <span class="badge bg-{% if bot[4] == 'completed' %}success{% elif bot[4] == 'running' %}primary{% else %}secondary{% endif %}">
+                                    {{ bot[4] }}
+                                </span>
+                            </td>
+                            <td>{{ bot[5] }}</td>
+                            <td>
+                                <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View NEWT Results
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
