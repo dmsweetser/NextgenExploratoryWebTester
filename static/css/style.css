@@ -26,6 +26,7 @@ body {
     margin-left: 240px;
     padding: 20px;
     overflow-x: hidden;
+    width:80%;
 }
 
 @media (max-width: 767.98px) {
