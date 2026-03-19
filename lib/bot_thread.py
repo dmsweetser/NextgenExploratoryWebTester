@@ -13,7 +13,7 @@ from lib.config import Config
 from lib.llm_integration import LLMFactory
 
 class BotThread(threading.Thread):
-    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None):
+    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None, known_bug_summaries=None):
         threading.Thread.__init__(self)
         self.bot_id = bot_id
         self.start_url = start_url
@@ -28,6 +28,7 @@ class BotThread(threading.Thread):
         self.llm = None
         self.driver = None
         self.steps_taken = steps_taken or []
+        self.known_bug_summaries = known_bug_summaries or []
         self.logger = logger
 
     def run(self):
@@ -37,9 +38,8 @@ class BotThread(threading.Thread):
             self.initialize_driver()
             self.llm = self.llm_factory.create_llm()
 
-            known_bugs = self.db.get_known_bugs()
-            step_number = 1
-            steps_taken = []
+            known_bugs = self.db.get_known_bugs() + self.known_bug_summaries
+            step_number = len(self.steps_taken) + 1
 
             while not self.stop_event.is_set():
                 self.driver.get(self.start_url)
@@ -59,7 +59,8 @@ class BotThread(threading.Thread):
                     'current_page': simplified_html,
                     'known_bugs': known_bugs,
                     'steps_taken': self.steps_taken,
-                    'current_url': current_url
+                    'current_url': current_url,
+                    'previous_bug_summaries': self.known_bug_summaries
                 }
 
                 action = self.get_next_action(context)
@@ -67,7 +68,7 @@ class BotThread(threading.Thread):
                 # Execute action
                 result = self.execute_action(action, step_number)
                 if result['success']:
-                    steps_taken.append({
+                    self.steps_taken.append({
                         'step': step_number,
                         'action': action['action'],
                         'element': action.get('element', ''),
@@ -117,6 +118,9 @@ class BotThread(threading.Thread):
         Known bugs to avoid:
         {chr(10).join(context['known_bugs'])}
 
+        Previous bug summaries:
+        {chr(10).join(context['previous_bug_summaries'])}
+
         Steps taken so far:
         {chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')}" for s in context['steps_taken']])}
 
@@ -127,6 +131,8 @@ class BotThread(threading.Thread):
         - "element": The CSS selector for the element to interact with
         - "value": For fill/select actions, the value to fill (if needed)
         - "reasoning": Brief explanation of your choice
+
+        IMPORTANT: Avoid repeating actions that have already been attempted. Consider the previous bugs and steps to determine a new approach.
         """
 
         return self.llm.get_action(prompt)

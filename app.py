@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import sqlite3
 import logging
@@ -61,7 +62,9 @@ def create_bot():
             html_simplifier=html_simplifier,
             screenshot_capturer=screenshot_capturer,
             llm_factory=LLMFactory(),
-            logger=logger
+            logger=logger,
+            steps_taken=[],
+            known_bug_summaries=[]
         )
         bot_thread.start()
         bot_manager.add_bot(bot_thread)
@@ -108,6 +111,38 @@ def stop_bot(bot_id):
     bot_manager.stop_bot(bot_id)
     db.update_bot_status(bot_id, 'stopped')
     return redirect(url_for('bot', bot_id=bot_id))
+
+@app.route('/restart/<int:bot_id>', methods=['POST'])
+def restart_bot(bot_id):
+    bot = db.get_bot(bot_id)
+    if not bot:
+        return redirect(url_for('index'))
+
+    bot_thread = BotThread(
+        bot_id=bot[0],
+        start_url=bot[2],
+        directive=bot[3],
+        db=db,
+        bot_manager=bot_manager,
+        bug_reporter=bug_reporter,
+        html_simplifier=html_simplifier,
+        screenshot_capturer=screenshot_capturer,
+        llm_factory=LLMFactory(),
+        logger=logger,
+        steps_taken=[],
+        known_bug_summaries=[]
+    )
+    bot_thread.start()
+    bot_manager.add_bot(bot_thread)
+    db.update_bot_status(bot_id, 'running', datetime.now().isoformat())
+
+    return redirect(url_for('bot', bot_id=bot_id))
+
+@app.route('/remove/<int:bot_id>', methods=['POST'])
+def remove_bot(bot_id):
+    bot_manager.stop_bot(bot_id)
+    db.update_bot_status(bot_id, 'removed', datetime.now().isoformat())
+    return redirect(url_for('index'))
 
 @app.route('/self-test', methods=['POST'])
 def run_self_test():
