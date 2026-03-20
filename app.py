@@ -18,7 +18,7 @@ from lib.screenshot_capturer import ScreenshotCapturer
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('newt.log'),
@@ -26,6 +26,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -142,6 +143,7 @@ def restart_bot(bot_id):
 def remove_bot(bot_id):
     bot_manager.stop_bot(bot_id)
     db.update_bot_status(bot_id, 'removed', datetime.now().isoformat())
+    logger.info(f"Bot {bot_id} removed by user")
     return redirect(url_for('index'))
 
 @app.route('/self-test', methods=['POST'])

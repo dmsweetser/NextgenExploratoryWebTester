@@ -174,14 +174,21 @@ class BotThread(threading.Thread):
         except Exception as e:
             error_msg = f"Failed to {action['action']} element {action.get('element', '')}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
+            self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
             screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}.png")
             self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), screenshot_path)
             return {'success': False, 'screenshot': screenshot_path}
 
     def detect_bug(self, action, result):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+        steps_context = "\n".join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
         prompt = f"""
-        Analyze the following page content and determine if there's a bug based on the previous action: {action['action']} {action.get('element', '')}
+        Analyze the following page content and determine if there's a bug based on the previous action.
+
+        Previous steps taken:
+        {steps_context}
+
+        Current action: {action['action']} {action.get('element', '')}
 
         Page content:
         {simplified_html}
@@ -199,7 +206,9 @@ class BotThread(threading.Thread):
         - "recommendation": how to fix or work around this bug
         """
 
+        self.logger.debug(f"Bot {self.bot_id} - Bug detection prompt: {prompt[:500]}...")
         analysis = self.llm.get_action(prompt)
+        self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
         return analysis.get('is_bug', False), analysis
 
     def report_bug(self, action, result, context, analysis):
