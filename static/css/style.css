@@ -132,8 +132,16 @@ body {
 }
 
 .img-thumbnail {
-    max-width: 300px;
+    max-width: 100%;
     height: auto;
+}
+
+.full-page-screenshot {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    margin-top: 10px;
+    display: block;
 }
 
 @media (min-width: 768px) {

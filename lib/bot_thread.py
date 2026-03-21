@@ -42,8 +42,18 @@ class BotThread(threading.Thread):
             step_number = len(self.steps_taken) + 1
 
             while not self.stop_event.is_set():
-                self.driver.get(self.start_url)
-                time.sleep(2)
+                try:
+                    self.driver.get(self.start_url)
+                    # Handle any unexpected alerts
+                    try:
+                        alert = self.driver.switch_to.alert
+                        alert.accept()
+                    except:
+                        pass
+                    time.sleep(2)
+                except Exception as e:
+                    self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
+                    break
 
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
                 current_url = self.driver.current_url
@@ -106,7 +116,18 @@ class BotThread(threading.Thread):
             options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-infobars')
+        options.add_argument('--disable-notifications')
+        options.add_argument('--disable-popup-blocking')
+        options.add_argument('--ignore-certificate-errors')
+        options.add_argument('--allow-running-insecure-content')
+        options.add_argument('--disable-web-security')
         self.driver = webdriver.Chrome(options=options)
+        # Set window size to capture full page
+        self.driver.set_window_size(1920, 1080)
+        # Configure to handle unexpected alerts
+        self.driver.implicitly_wait(10)
 
     def get_next_action(self, context):
         prompt = f"""
@@ -151,21 +172,57 @@ class BotThread(threading.Thread):
     def execute_action(self, action, step_number):
         try:
             if action['action'] == 'click':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                element.click()
-                action_text = f"Clicked {action['element']}"
+                try:
+                    element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
+                    element.click()
+                    action_text = f"Clicked {action['element']}"
+                except Exception as e:
+                    # Handle unexpected alerts after click
+                    try:
+                        alert = self.driver.switch_to.alert
+                        alert.accept()
+                        action_text = f"Clicked {action['element']} and accepted alert"
+                    except:
+                        raise e
             elif action['action'] == 'fill':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                element.send_keys(action['value'])
-                action_text = f"Filled {action['element']} with {action['value']}"
+                try:
+                    element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
+                    element.send_keys(action['value'])
+                    action_text = f"Filled {action['element']} with {action['value']}"
+                except Exception as e:
+                    # Handle unexpected alerts after fill
+                    try:
+                        alert = self.driver.switch_to.alert
+                        alert.accept()
+                        action_text = f"Filled {action['element']} with {action['value']} and accepted alert"
+                    except:
+                        raise e
             elif action['action'] == 'select':
-                select = Select(self.driver.find_element(By.CSS_SELECTOR, action['element']))
-                select.select_by_value(action['value'])
-                action_text = f"Selected {action['value']} from {action['element']}"
+                try:
+                    select = Select(self.driver.find_element(By.CSS_SELECTOR, action['element']))
+                    select.select_by_value(action['value'])
+                    action_text = f"Selected {action['value']} from {action['element']}"
+                except Exception as e:
+                    # Handle unexpected alerts after select
+                    try:
+                        alert = self.driver.switch_to.alert
+                        alert.accept()
+                        action_text = f"Selected {action['value']} from {action['element']} and accepted alert"
+                    except:
+                        raise e
             elif action['action'] == 'submit':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                element.submit()
-                action_text = f"Submitted form via {action['element']}"
+                try:
+                    element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
+                    element.submit()
+                    action_text = f"Submitted form via {action['element']}"
+                except Exception as e:
+                    # Handle unexpected alerts after submit
+                    try:
+                        alert = self.driver.switch_to.alert
+                        alert.accept()
+                        action_text = f"Submitted form via {action['element']} and accepted alert"
+                    except:
+                        raise e
             elif action['action'] == 'wait':
                 time.sleep(int(action['value']))
                 action_text = f"Waited for {action['value']} seconds"
