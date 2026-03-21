@@ -66,6 +66,10 @@ class LocalLlama:
                 break
             response_content += token
             current_iteration += 1
+            # Add timeout to prevent hanging
+            if current_iteration > 10000:  # 10,000 tokens should be enough
+                process.terminate()
+                break
         process.wait()
 
         try:
@@ -73,10 +77,10 @@ class LocalLlama:
             return json.loads(response_content)
         except json.JSONDecodeError:
             return {
-                "action": "wait",
-                "element": "",
-                "value": "2",
-                "reasoning": "Fallback action due to JSON parsing error"
+                "action": "click",
+                "element": "button.btn-primary",
+                "value": "",
+                "reasoning": "Fallback action due to JSON parsing error - clicking primary button"
             }
 
 class AzureFoundry:

@@ -135,7 +135,18 @@ class BotThread(threading.Thread):
         IMPORTANT: Avoid repeating actions that have already been attempted. Consider the previous bugs and steps to determine a new approach.
         """
 
-        return self.llm.get_action(prompt)
+        action = self.llm.get_action(prompt)
+
+        # If JSON parsing failed, provide a default action
+        if not isinstance(action, dict):
+            return {
+                "action": "click",
+                "element": "button.btn-primary",
+                "value": "",
+                "reasoning": "Fallback action - clicking primary button"
+            }
+
+        return action
 
     def execute_action(self, action, step_number):
         try:
@@ -257,6 +268,11 @@ class BotThread(threading.Thread):
         """
 
         completion_check = self.llm.get_action(prompt)
+
+        # If JSON parsing fails, assume not complete
+        if not isinstance(completion_check, dict):
+            return False
+
         return completion_check.get('complete', False)
 
     def is_same_domain(self, url1, url2):

@@ -14,7 +14,7 @@ class Config:
 
     @classmethod
     def get_model_context(cls) -> int:
-        return int(os.getenv('MODEL_CONTEXT', '2048'))
+        return int(os.getenv('MODEL_CONTEXT', '131072'))
 
     @classmethod
     def get_model_threads(cls) -> int:
@@ -22,7 +22,7 @@ class Config:
 
     @classmethod
     def get_model_batch(cls) -> int:
-        return int(os.getenv('MODEL_BATCH', '8'))
+        return int(os.getenv('MODEL_BATCH', '512'))
 
     @classmethod
     def get_model_gpu_layers(cls) -> int:
@@ -42,7 +42,7 @@ class Config:
 
     @classmethod
     def get_output_tokens(cls) -> int:
-        return int(os.getenv('OUTPUT_TOKENS', '1024'))
+        return int(os.getenv('OUTPUT_TOKENS', '32768'))
 
     @classmethod
     def get_temperature(cls) -> float:
