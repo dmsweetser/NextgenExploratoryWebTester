@@ -178,13 +178,11 @@ class BotThread(threading.Thread):
                     element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                     element.click()
                     action_text = f"Clicked {action['element']}"
+                    # Handle potential alerts after click
+                    self.handle_alerts()
                 except Exception as e:
                     # Handle unexpected alerts after click
-                    try:
-                        alert = self.driver.switch_to.alert
-                        alert.accept()
-                        action_text = f"Clicked {action['element']} and accepted alert"
-                    except:
+                    if not self.handle_alerts():
                         raise e
             elif action['action'] == 'fill':
                 try:
@@ -195,8 +193,8 @@ class BotThread(threading.Thread):
                     self.handle_alerts()
                 except Exception as e:
                     # Handle unexpected alerts after fill
-                    self.handle_alerts()
-                    raise e
+                    if not self.handle_alerts():
+                        raise e
             elif action['action'] == 'select':
                 try:
                     select = Select(self.driver.find_element(By.CSS_SELECTOR, action['element']))
@@ -206,8 +204,8 @@ class BotThread(threading.Thread):
                     self.handle_alerts()
                 except Exception as e:
                     # Handle unexpected alerts after select
-                    self.handle_alerts()
-                    raise e
+                    if not self.handle_alerts():
+                        raise e
             elif action['action'] == 'submit':
                 try:
                     element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
@@ -217,8 +215,8 @@ class BotThread(threading.Thread):
                     self.handle_alerts()
                 except Exception as e:
                     # Handle unexpected alerts after submit
-                    self.handle_alerts()
-                    raise e
+                    if not self.handle_alerts():
+                        raise e
             elif action['action'] == 'wait':
                 time.sleep(int(action['value']))
                 action_text = f"Waited for {action['value']} seconds"
@@ -230,6 +228,7 @@ class BotThread(threading.Thread):
                 self.db.add_step(self.bot_id, step_number, action_text, action['element'], None)
                 return {'success': True, 'screenshot': None}
 
+            # Take screenshot before handling alerts to capture the state
             screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}.png")
             self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), screenshot_path)
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
