@@ -46,6 +46,13 @@
                     <button type="submit" class="btn btn-primary">Login</button>
                     <button type="button" class="btn btn-secondary" onclick="showError()">Show Error</button>
                 </form>
+                <script>
+                    // Prevent form submission from triggering alert
+                    document.getElementById('loginForm').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        alert('Login form submitted!');
+                    });
+                </script>
             </div>
         </div>
 

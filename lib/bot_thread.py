@@ -123,6 +123,8 @@ class BotThread(threading.Thread):
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--allow-running-insecure-content')
         options.add_argument('--disable-web-security')
+        # Configure to handle unexpected alerts
+        options.add_argument('--disable-features=VizDisplayCompositor')
         self.driver = webdriver.Chrome(options=options)
         # Set window size to capture full page
         self.driver.set_window_size(1920, 1080)
@@ -189,40 +191,34 @@ class BotThread(threading.Thread):
                     element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                     element.send_keys(action['value'])
                     action_text = f"Filled {action['element']} with {action['value']}"
+                    # Handle potential alerts after fill
+                    self.handle_alerts()
                 except Exception as e:
                     # Handle unexpected alerts after fill
-                    try:
-                        alert = self.driver.switch_to.alert
-                        alert.accept()
-                        action_text = f"Filled {action['element']} with {action['value']} and accepted alert"
-                    except:
-                        raise e
+                    self.handle_alerts()
+                    raise e
             elif action['action'] == 'select':
                 try:
                     select = Select(self.driver.find_element(By.CSS_SELECTOR, action['element']))
                     select.select_by_value(action['value'])
                     action_text = f"Selected {action['value']} from {action['element']}"
+                    # Handle potential alerts after select
+                    self.handle_alerts()
                 except Exception as e:
                     # Handle unexpected alerts after select
-                    try:
-                        alert = self.driver.switch_to.alert
-                        alert.accept()
-                        action_text = f"Selected {action['value']} from {action['element']} and accepted alert"
-                    except:
-                        raise e
+                    self.handle_alerts()
+                    raise e
             elif action['action'] == 'submit':
                 try:
                     element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                     element.submit()
                     action_text = f"Submitted form via {action['element']}"
+                    # Handle potential alerts after submit
+                    self.handle_alerts()
                 except Exception as e:
                     # Handle unexpected alerts after submit
-                    try:
-                        alert = self.driver.switch_to.alert
-                        alert.accept()
-                        action_text = f"Submitted form via {action['element']} and accepted alert"
-                    except:
-                        raise e
+                    self.handle_alerts()
+                    raise e
             elif action['action'] == 'wait':
                 time.sleep(int(action['value']))
                 action_text = f"Waited for {action['value']} seconds"
@@ -337,6 +333,17 @@ class BotThread(threading.Thread):
         domain1 = urlparse(url1).netloc
         domain2 = urlparse(url2).netloc
         return domain1 == domain2
+
+    def handle_alerts(self):
+        """Handle any unexpected alerts that may appear during bot execution"""
+        try:
+            alert = self.driver.switch_to.alert
+            alert_text = alert.text
+            alert.accept()
+            self.logger.info(f"Bot {self.bot_id} - Accepted alert: {alert_text}")
+            return True
+        except:
+            return False
 
     def cleanup(self):
         if self.driver:
