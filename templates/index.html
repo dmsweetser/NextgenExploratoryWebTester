@@ -1,0 +1,88 @@
+{% extends "layout.html" %}
+
+{% block title %}NEWT - Dashboard{% endblock %}
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Dashboard</h1>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-header">Active Bots</div>
+                <div class="card-body">
+                    <h5 class="card-title">0</h5>
+                    <p class="card-text">Currently running bots</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-header">Completed Bots</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ bots|length }}</h5>
+                    <p class="card-text">Total bots completed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-header">Bugs Found</div>
+                <div class="card-body">
+                    <h5 class="card-title">0</h5>
+                    <p class="card-text">Total bugs reported</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-robot"></i> Active NEWT Bots
+        </div>
+        <div class="card-body">
+            <p class="text-muted">No active NEWT bots at the moment.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-clock-history"></i> NEWT Test History
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>NEWT Bot Name</th>
+                            <th>Start URL</th>
+                            <th>Status</th>
+                            <th>Last Activity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bot in bots %}
+                        <tr>
+                            <td>{{ bot[1] }}</td>
+                            <td><a href="{{ bot[2] }}" target="_blank" class="text-decoration-none">{{ bot[2] }}</a></td>
+                            <td>
+                                <span class="badge bg-{% if bot[4] == 'completed' %}success{% elif bot[4] == 'running' %}primary{% else %}secondary{% endif %}">
+                                    {{ bot[4] }}
+                                </span>
+                            </td>
+                            <td>{{ bot[5] }}</td>
+                            <td>
+                                <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View NEWT Results
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
