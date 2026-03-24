@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Website</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .btn-custom {
+            margin: 5px;
+        }
+        .bug-section {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Test Website for NEWT</h1>
+        <p class="lead">This is a dummy website for testing the NEWT (Next-gen Exploratory Web Tester) bot.</p>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Login Form</h5>
+            </div>
+            <div class="card-body">
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" placeholder="Enter username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" placeholder="Enter password">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                    <button type="button" class="btn btn-secondary" onclick="showError()">Show Error</button>
+                </form>
+                <script>
+                    // Prevent form submission from triggering alert
+                    document.getElementById('loginForm').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        alert('Login form submitted!');
+                    });
+                </script>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Dropdown Menu</h5>
+            </div>
+            <div class="card-body">
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
+                        Select an option
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                        <a class="dropdown-item" href="#">Option 1</a>
+                        <a class="dropdown-item" href="#">Option 2</a>
+                        <a class="dropdown-item" href="#">Option 3</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Form with Select</h5>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="mb-3">
+                        <label for="selectExample" class="form-label">Example Select</label>
+                        <select class="form-select" id="selectExample">
+                            <option selected>Open this select menu</option>
+                            <option value="1">Option 1</option>
+                            <option value="2">Option 2</option>
+                            <option value="3">Option 3</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Buttons</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary btn-custom">Primary Button</button>
+                <button class="btn btn-secondary btn-custom">Secondary Button</button>
+                <button class="btn btn-success btn-custom">Success Button</button>
+                <button class="btn btn-danger btn-custom">Danger Button</button>
+                <button class="btn btn-warning btn-custom">Warning Button</button>
+                <button class="btn btn-info btn-custom">Info Button</button>
+                <button class="btn btn-light btn-custom">Light Button</button>
+                <button class="btn btn-dark btn-custom">Dark Button</button>
+            </div>
+        </div>
+
+        <div class="bug-section">
+            <h5>Known Bug</h5>
+            <p>This form has a known bug - when you click the "Show Error" button, it will display an error message that the bot should detect.</p>
+            <div id="errorMessage" style="display: none; color: red; margin-top: 10px;">
+                ERROR: This is a test error that the bot should detect as a bug!
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showError() {
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('Login form submitted!');
+        });
+    </script>
+</body>
+</html>

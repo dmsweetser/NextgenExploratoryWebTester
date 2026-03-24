@@ -1,0 +1,152 @@
+{% extends "layout.html" %}
+
+{% block title %}Web Testing Bot - Bot Details{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ bot[1] }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group mr-2">
+            <form action="{{ url_for('stop_bot', bot_id=bot[0]) }}" method="post">
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-stop-circle"></i> Stop Bot
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h5><i class="bi bi-info-circle"></i> NEWT Bot Information</h5>
+                <table class="table table-borderless">
+                    <tr>
+                        <th width="30%">Status:</th>
+                        <td>
+                            <span
+                                class="badge bg-{% if bot[4] == 'running' %}primary{% elif bot[4] == 'completed' %}success{% elif bot[4] == 'stopped' %}warning{% else %}secondary{% endif %}">
+                                {{ bot[4] }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Start URL:</th>
+                        <td><a href="{{ bot[2] }}" target="_blank">{{ bot[2] }}</a></td>
+                    </tr>
+                    <tr>
+                        <th>Directive:</th>
+                        <td>{{ bot[3] }}</td>
+                    </tr>
+                    <tr>
+                        <th>Last Activity:</th>
+                        <td>{{ bot[5] }}</td>
+                    </tr>
+                    <tr>
+                        <th>Created:</th>
+                        <td>{{ bot[6] }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h5><i class="bi bi-gear"></i> Actions</h5>
+                <div class="btn-group" role="group">
+                    <form action="{{ url_for('stop_bot', bot_id=bot[0]) }}" method="post">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-stop-circle"></i> Stop Bot
+                        </button>
+                    </form>
+                    {% if bot[4] == 'stopped' %}
+                    <form action="{{ url_for('restart_bot', bot_id=bot[0]) }}" method="post">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-play-circle"></i> Restart Bot
+                        </button>
+                    </form>
+                    {% endif %}
+                    <form action="{{ url_for('remove_bot', bot_id=bot[0]) }}" method="post">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Remove Bot
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-list-ul"></i> NEWT Execution Steps
+    </div>
+    <div class="card-body">
+        {% if steps %}
+        <div class="timeline">
+            {% for step in steps %}
+            <div class="timeline-item">
+                <div class="timeline-point"></div>
+                <div class="timeline-content">
+                    <h6 class="timeline-title">{{ step[3] }}</h6>
+                    <p class="timeline-time">{{ step[6] }}</p>
+                    {% if step[5] %}
+                    <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}"
+                        class="img-thumbnail full-page-screenshot" alt="NEWT step screenshot">
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No NEWT steps recorded yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-bug"></i> NEWT Bugs Found
+    </div>
+    <div class="card-body">
+        {% if bugs %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Summary</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bug in bugs %}
+                    <tr>
+                        <td>{{ bug[2] }}</td>
+                        <td>
+                            <span class="badge bg-{% if bug[6] == 'resolved' %}success{% else %}warning{% endif %}">
+                                {{ bug[6] }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('export_bug', bug_id=bug[0]) }}"
+                                class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-download"></i> Export NEWT Report
+                            </a>
+                            {% if bug[6] != 'resolved' %}
+                            <form action="{{ url_for('resolve_bug', bug_id=bug[0]) }}" method="post"
+                                style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-check-circle"></i> Resolve
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No NEWT bugs found yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
