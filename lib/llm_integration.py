@@ -13,7 +13,7 @@ class LLMFactory:
 
 class LocalLlama:
     def __init__(self):
-        self.response_file = "response.log"
+        self.response_file = "data/response.log"
 
     def get_action(self, prompt):
         model_path = Config.get_model_path()
@@ -27,7 +27,7 @@ class LocalLlama:
             raise FileNotFoundError(f"llama binary not found at: {llama_binary}")
 
         ticks = int(time.time() * 1000)
-        filename = f"prompt_{ticks}.txt"
+        filename = f"data/prompt_{ticks}.txt"
         with open(filename, "w") as f:
             f.write(prompt)
 

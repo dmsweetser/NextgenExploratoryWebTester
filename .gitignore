@@ -12,3 +12,4 @@ newt.log
 response.log
 llama.cpp
 uploads
+static/images/*

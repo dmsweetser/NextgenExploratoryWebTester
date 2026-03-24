@@ -16,21 +16,25 @@ from lib.database import Database
 from lib.html_simplifier import HTMLSimplifier
 from lib.screenshot_capturer import ScreenshotCapturer
 
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'static/images'
+app.config['DATA_DIR'] = 'data'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
+
+if not os.path.exists(app.config['DATA_DIR']):
+    os.makedirs(app.config['DATA_DIR'])
+
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('newt.log'),
+        logging.FileHandler(app.config['DATA_DIR'] + '/newt.log'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 
 # Initialize components
 db = Database()

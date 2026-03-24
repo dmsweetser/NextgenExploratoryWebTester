@@ -45,6 +45,5 @@ class HTMLSimplifier:
         # Convert HTML to text and remove excessive whitespace
         simplified_html = str(soup)
         simplified_html = ' '.join(simplified_html.split())
-        simplified_html = simplified_html.replace('<', '').replace('>', '')
 
         return simplified_html

@@ -6,7 +6,7 @@ class Database:
         self.init_db()
 
     def init_db(self):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS bots
                      (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +47,7 @@ class Database:
         conn.close()
 
     def create_bot(self, name, start_url, directive):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("INSERT INTO bots (name, start_url, directive) VALUES (?, ?, ?)",
                  (name, start_url, directive))
@@ -57,7 +57,7 @@ class Database:
         return bot_id
 
     def get_all_bots(self):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM bots ORDER BY created_at DESC")
         bots = c.fetchall()
@@ -65,7 +65,7 @@ class Database:
         return bots
 
     def get_bot(self, bot_id):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM bots WHERE id = ?", (bot_id,))
         bot = c.fetchone()
@@ -73,7 +73,7 @@ class Database:
         return bot
 
     def update_bot_status(self, bot_id, status, last_activity=None):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         if last_activity:
             c.execute("UPDATE bots SET status = ?, last_activity = ? WHERE id = ?",
@@ -84,7 +84,7 @@ class Database:
         conn.close()
 
     def add_step(self, bot_id, step_number, action, element, screenshot_path):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_path) VALUES (?, ?, ?, ?, ?)",
                  (bot_id, step_number, action, element, screenshot_path))
@@ -92,7 +92,7 @@ class Database:
         conn.close()
 
     def get_steps(self, bot_id):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM steps WHERE bot_id = ? ORDER BY step_number", (bot_id,))
         steps = c.fetchall()
@@ -100,7 +100,7 @@ class Database:
         return steps
 
     def add_bug(self, bot_id, summary, steps, screenshot_path):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_path) VALUES (?, ?, ?, ?)",
                  (bot_id, summary, steps, screenshot_path))
@@ -110,7 +110,7 @@ class Database:
         return bug_id
 
     def get_bugs(self, bot_id):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM bugs WHERE bot_id = ?", (bot_id,))
         bugs = c.fetchall()
@@ -118,7 +118,7 @@ class Database:
         return bugs
 
     def get_all_bugs(self):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT b.*, bt.name as bot_name FROM bugs b JOIN bots bt ON b.bot_id = bt.id ORDER BY b.id DESC")
         bugs = c.fetchall()
@@ -126,7 +126,7 @@ class Database:
         return bugs
 
     def get_bug_with_bot_name(self, bug_id):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT b.*, bt.name as bot_name FROM bugs b JOIN bots bt ON b.bot_id = bt.id WHERE b.id = ?", (bug_id,))
         bug = c.fetchone()
@@ -134,7 +134,7 @@ class Database:
         return bug
 
     def resolve_bug(self, bug_id):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("UPDATE bugs SET status = 'resolved', resolved_at = ? WHERE id = ?",
                  (datetime.now().isoformat(), bug_id))
@@ -142,7 +142,7 @@ class Database:
         conn.close()
 
     def add_knowledge(self, bug_id, knowledge_text):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("INSERT INTO bug_knowledge (bug_id, knowledge_text) VALUES (?, ?)",
                  (bug_id, knowledge_text))
@@ -150,7 +150,7 @@ class Database:
         conn.close()
 
     def get_knowledge_for_bug(self, bug_id):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT knowledge_text FROM bug_knowledge WHERE bug_id = ?", (bug_id,))
         result = c.fetchone()
@@ -158,7 +158,7 @@ class Database:
         return result[0] if result else ""
 
     def get_all_knowledge(self):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM bug_knowledge")
         knowledge = {row[1]: row[2] for row in c.fetchall()}
@@ -166,7 +166,7 @@ class Database:
         return knowledge
 
     def get_known_bugs(self):
-        conn = sqlite3.connect('bots.db')
+        conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT knowledge_text FROM bug_knowledge")
         known_bugs = [row[0] for row in c.fetchall()]

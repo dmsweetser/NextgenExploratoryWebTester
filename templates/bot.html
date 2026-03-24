@@ -88,7 +88,7 @@
                     <h6 class="timeline-title">{{ step[3] }}</h6>
                     <p class="timeline-time">{{ step[6] }}</p>
                     {% if step[5] %}
-                    <img src="{{ url_for('static', filename=step[5].replace('uploads/', '')) }}"
+                    <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}"
                         class="img-thumbnail full-page-screenshot" alt="NEWT step screenshot">
                     {% endif %}
                 </div>

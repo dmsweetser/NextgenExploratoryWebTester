@@ -155,7 +155,13 @@ class BotThread(threading.Thread):
         - "value": For fill/select actions, the value to fill (if needed)
         - "reasoning": Brief explanation of your choice
 
-        IMPORTANT: Avoid repeating actions that have already been attempted. Consider the previous bugs and steps to determine a new approach.
+        IMPORTANT: 
+        1) Avoid repeating actions that have already been attempted
+        2) Consider the previous bugs and steps to determine a new approach
+        3) Use the most specific, unique selector when interacting with an element
+
+        THAT'S AN ORDER, SOLDIER!
+
         """
 
         action = self.llm.get_action(prompt)
@@ -228,7 +234,7 @@ class BotThread(threading.Thread):
                 self.db.add_step(self.bot_id, step_number, action_text, action['element'], None)
                 return {'success': True, 'screenshot': None}
 
-            # Take screenshot before handling alerts to capture the state
+            self.handle_alerts()
             screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}.png")
             self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), screenshot_path)
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")

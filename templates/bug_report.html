@@ -74,7 +74,7 @@
                 {% if step[4] %}<br><small>Element: {{ step[4] }}</small>{% endif %}
                 {% if step[5] %}
                 <br>
-                <img src="{{ url_for('static', filename=step[5].replace('uploads/', '')) }}" class="screenshot" alt="Step screenshot">
+                <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}" class="screenshot" alt="Step screenshot">
                 {% endif %}
             </li>
             {% endfor %}
@@ -89,7 +89,7 @@
     <div class="section">
         <h2 class="section-title">Screenshot</h2>
         {% if bug[5] %}
-        <img src="{{ url_for('static', filename=bug[5].replace('uploads/', '')) }}" class="screenshot" alt="Bug screenshot">
+        <img src="{{ url_for('static', filename=bug[5].replace('static/','')) }}" class="screenshot" alt="Bug screenshot">
         {% else %}
         <p>No screenshot available</p>
         {% endif %}
