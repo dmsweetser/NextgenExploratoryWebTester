@@ -1,4 +1,5 @@
 import logging
+import re
 import subprocess
 import os
 import time
@@ -72,8 +73,13 @@ class LocalLlama:
                 break
         process.wait()
 
+        def extract_code_block(response_content):
+            match = re.search(r"```(.*?)```", response_content, re.DOTALL)
+            return match.group(1).strip() if match else ""
+
         try:
             import json
+            response_content = extract_code_block(response_content)
             return json.loads(response_content)
         except json.JSONDecodeError:
             return {
