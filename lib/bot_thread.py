@@ -168,12 +168,7 @@ class BotThread(threading.Thread):
 
         # If JSON parsing failed, provide a default action
         if not isinstance(action, dict):
-            return {
-                "action": "click",
-                "element": "button.btn-primary",
-                "value": "",
-                "reasoning": "Fallback action - clicking primary button"
-            }
+            return {}
 
         return action
 
@@ -295,7 +290,8 @@ class BotThread(threading.Thread):
         - Description: {analysis['description']}
         - Recommendation: {analysis['recommendation']}
 
-        Provide a concise technical summary of what went wrong and how to avoid similar issues in the future.
+        Respond with a JSON object containing:
+        - "reasoning": A concise technical summary of what went wrong and how to avoid similar issues in the future.
         """
         knowledge_response = self.llm.get_action(knowledge_prompt)
         knowledge = knowledge_response.get('reasoning', 'No additional knowledge provided')

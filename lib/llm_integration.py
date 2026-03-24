@@ -5,6 +5,11 @@ import os
 import time
 from lib.config import Config
 
+def extract_code_block(response_content):
+    match = re.search(r"```(.*?)```", response_content, re.DOTALL)
+    return match.group(1).strip() if match else ""
+
+
 class LLMFactory:
     def create_llm(self):
         if Config.use_local_model():
@@ -73,21 +78,13 @@ class LocalLlama:
                 break
         process.wait()
 
-        def extract_code_block(response_content):
-            match = re.search(r"```(.*?)```", response_content, re.DOTALL)
-            return match.group(1).strip() if match else ""
-
         try:
             import json
             response_content = extract_code_block(response_content)
+            response_content = response_content.replace('json\n','')
             return json.loads(response_content)
         except json.JSONDecodeError:
-            return {
-                "action": "click",
-                "element": "button.btn-primary",
-                "value": "",
-                "reasoning": "Fallback action due to JSON parsing error - clicking primary button"
-            }
+            return response_content
 
 class AzureFoundry:
     def __init__(self):
@@ -137,11 +134,8 @@ class AzureFoundry:
 
         try:
             import json
+            response_content = extract_code_block(response_content)
+            response_content = response_content.replace('json\n','')
             return json.loads(response_content)
         except json.JSONDecodeError:
-            return {
-                "action": "wait",
-                "element": "",
-                "value": "2",
-                "reasoning": "Fallback action due to JSON parsing error"
-            }
+            return response_content
