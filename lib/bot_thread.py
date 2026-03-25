@@ -309,7 +309,7 @@ class BotThread(threading.Thread):
         summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
         bug_id = self.db.add_bug(self.bot_id, summary, steps, result['screenshot'])
-        knowledge = extract_line_based_content(analysis, "[newt_recommendation_start]", "[newt_recommendation_start]")
+        knowledge = analysis["description"] + "\n\n" + analysis["recommendation"]
         self.db.add_knowledge(bug_id, knowledge)
 
         self.bug_reporter.send_notification(summary, knowledge, analysis.get('severity', 'medium'))
