@@ -10,7 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime
 from lib.config import Config
-from lib.llm_integration import LLMFactory
+from lib.llm_integration import LLMFactory, extract_line_based_content
 
 class BotThread(threading.Thread):
     def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None, known_bug_summaries=None):
@@ -177,10 +177,10 @@ class BotThread(threading.Thread):
 
         action = self.llm.get_action(prompt)
         return {
-            "action": self.llm.extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
-            "element": self.llm.extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
-            "value": self.llm.extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
-            "reasoning": self.llm.extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
+            "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+            "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
+            "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
+            "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
         }
 
     def execute_action(self, action, step_number):
@@ -297,10 +297,10 @@ class BotThread(threading.Thread):
         analysis = self.llm.get_action(prompt)
         self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
         analysis_object = {
-            "is_bug": self.llm.extract_line_based_content(action, "[newt_isbug_start]", "[newt_isbug_end]"),
-            "severity": self.llm.extract_line_based_content(action, "[newt_severity_start]", "[newt_severity_end]"),
-            "description": self.llm.extract_line_based_content(action, "[newt_description_start]", "[newt_description_end]"),
-            "recommendation": self.llm.extract_line_based_content(action, "[newt_recommendation_start]", "[newt_recommendation_end]"),
+            "is_bug": extract_line_based_content(action, "[newt_isbug_start]", "[newt_isbug_end]"),
+            "severity": extract_line_based_content(action, "[newt_severity_start]", "[newt_severity_end]"),
+            "description": extract_line_based_content(action, "[newt_description_start]", "[newt_description_end]"),
+            "recommendation": extract_line_based_content(action, "[newt_recommendation_start]", "[newt_recommendation_end]"),
         }
         return analysis_object.get('is_bug', False), analysis_object
 
@@ -360,7 +360,7 @@ class BotThread(threading.Thread):
         """
 
         completion_check = self.llm.get_action(prompt)
-        parsed_completion_check = self.llm.extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
+        parsed_completion_check = extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
         return parsed_completion_check == "True"
 
     def is_same_domain(self, url1, url2):
