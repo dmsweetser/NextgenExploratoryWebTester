@@ -185,74 +185,75 @@ class BotThread(threading.Thread):
 
     def execute_action(self, action, step_number):
         try:
+            element = None
+            action_text = ""
+
             if action['action'] == 'click':
-                try:
-                    element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                    element.click()
-                    action_text = f"Clicked {action['element']}"
-                    # Handle potential alerts after click
-                    self.handle_alerts()
-                except Exception as e:
-                    # Handle unexpected alerts after click
-                    if not self.handle_alerts():
-                        raise e
+                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
+                action_text = f"Clicked {action['element']}"
+                # Highlight element before action
+                self.highlight_element(element)
+                element.click()
+                # Handle potential alerts after click
+                self.handle_alerts()
             elif action['action'] == 'fill':
-                try:
-                    element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                    element.send_keys(action['value'])
-                    action_text = f"Filled {action['element']} with {action['value']}"
-                    # Handle potential alerts after fill
-                    self.handle_alerts()
-                except Exception as e:
-                    # Handle unexpected alerts after fill
-                    if not self.handle_alerts():
-                        raise e
+                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
+                action_text = f"Filled {action['element']} with {action['value']}"
+                # Highlight element before action
+                self.highlight_element(element)
+                element.send_keys(action['value'])
+                # Handle potential alerts after fill
+                self.handle_alerts()
             elif action['action'] == 'select':
-                try:
-                    select = Select(self.driver.find_element(By.CSS_SELECTOR, action['element']))
-                    select.select_by_value(action['value'])
-                    action_text = f"Selected {action['value']} from {action['element']}"
-                    # Handle potential alerts after select
-                    self.handle_alerts()
-                except Exception as e:
-                    # Handle unexpected alerts after select
-                    if not self.handle_alerts():
-                        raise e
+                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
+                action_text = f"Selected {action['value']} from {action['element']}"
+                # Highlight element before action
+                self.highlight_element(element)
+                select = Select(element)
+                select.select_by_value(action['value'])
+                # Handle potential alerts after select
+                self.handle_alerts()
             elif action['action'] == 'submit':
-                try:
-                    element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                    element.submit()
-                    action_text = f"Submitted form via {action['element']}"
-                    # Handle potential alerts after submit
-                    self.handle_alerts()
-                except Exception as e:
-                    # Handle unexpected alerts after submit
-                    if not self.handle_alerts():
-                        raise e
+                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
+                action_text = f"Submitted form via {action['element']}"
+                # Highlight element before action
+                self.highlight_element(element)
+                element.submit()
+                # Handle potential alerts after submit
+                self.handle_alerts()
             elif action['action'] == 'wait':
                 time.sleep(int(action['value']))
                 action_text = f"Waited for {action['value']} seconds"
                 return {'success': True, 'screenshot': None}
             elif action['action'] == 'get_select_values':
-                select = Select(self.driver.find_element(By.CSS_SELECTOR, action['element']))
-                options = [{'text': option.text, 'value': option.get_attribute('value')} for option in select.options]
+                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Got select values from {action['element']}"
+                select = Select(element)
+                options = [{'text': option.text, 'value': option.get_attribute('value')} for option in select.options]
                 self.db.add_step(self.bot_id, step_number, action_text, action['element'], None)
                 return {'success': True, 'screenshot': None}
 
             self.handle_alerts()
-            screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}.png")
-            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), screenshot_path)
+
+            # Capture large screenshot and save both full and thumbnail versions
+            full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_full.png", full_size=True)
+            thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_thumb.png", full_size=False)
+
+            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), thumbnail_screenshot_path)
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
-            return {'success': True, 'screenshot': screenshot_path}
+
+            # Store full screenshot path for later use
+            result = {'success': True, 'screenshot': full_screenshot_path}
+            return result
 
         except Exception as e:
             error_msg = f"Failed to {action['action']} element {action.get('element', '')}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
-            screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}.png")
-            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), screenshot_path)
-            return {'success': False, 'screenshot': screenshot_path}
+            full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}_full.png", full_size=True)
+            thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}_thumb.png", full_size=False)
+            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), thumbnail_screenshot_path)
+            return {'success': False, 'screenshot': full_screenshot_path}
 
     def detect_bug(self, action, result):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -308,22 +309,7 @@ class BotThread(threading.Thread):
         summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
         bug_id = self.db.add_bug(self.bot_id, summary, steps, result['screenshot'])
-
-        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        knowledge_prompt = f"""
-        The NEWT bot detected a bug after attempting to {action['action']} element {action.get('element', '')}.
-        The page content was: {simplified_html}
-
-        The analysis indicates:
-        - Severity: {analysis['severity']}
-        - Description: {analysis['description']}
-        - Recommendation: {analysis['recommendation']}
-
-        Respond with a JSON object containing:
-        - "reasoning": A concise technical summary of what went wrong and how to avoid similar issues in the future.
-        """
-        knowledge_response = self.llm.get_action(knowledge_prompt)
-        knowledge = knowledge_response.get('reasoning', 'No additional knowledge provided')
+        knowledge = extract_line_based_content(analysis, "[newt_recommendation_start]", "[newt_recommendation_start]")
         self.db.add_knowledge(bug_id, knowledge)
 
         self.bug_reporter.send_notification(summary, knowledge, analysis.get('severity', 'medium'))
@@ -387,3 +373,12 @@ class BotThread(threading.Thread):
         self.db.update_bot_status(self.bot_id, 'completed', datetime.now().isoformat())
         self.bot_manager.remove_bot(self.bot_id)
         self.logger.info(f"Bot {self.bot_id} completed and removed from manager")
+
+    def highlight_element(self, element):
+        """Highlight an element to make it visible in the screenshot"""
+
+        # Add highlighting style
+        self.driver.execute_script("""
+            arguments[0].style.border = '3px solid #ff0000';
+            arguments[0].style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
+        """, element)

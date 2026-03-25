@@ -36,3 +36,42 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Function to show large image in modal
+function showLargeImage(imageUrl) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('imageModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'imageModal';
+        modal.className = 'modal fade';
+        modal.tabIndex = '-1';
+        modal.setAttribute('aria-labelledby', 'imageModalLabel');
+        modal.setAttribute('aria-hidden', 'true');
+
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="imageModalLabel">Full Screenshot</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <img id="largeImage" src="" class="img-fluid" alt="Full screenshot">
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // Set the image source
+    let img = document.getElementById('largeImage');
+    if (img) {
+        img.src = imageUrl;
+    }
+
+    // Show the modal
+    let modalInstance = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+    modalInstance.show();
+}
