@@ -297,10 +297,10 @@ class BotThread(threading.Thread):
         analysis = self.llm.get_action(prompt)
         self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
         analysis_object = {
-            "is_bug": extract_line_based_content(action, "[newt_isbug_start]", "[newt_isbug_end]"),
-            "severity": extract_line_based_content(action, "[newt_severity_start]", "[newt_severity_end]"),
-            "description": extract_line_based_content(action, "[newt_description_start]", "[newt_description_end]"),
-            "recommendation": extract_line_based_content(action, "[newt_recommendation_start]", "[newt_recommendation_end]"),
+            "is_bug": extract_line_based_content(analysis, "[newt_isbug_start]", "[newt_isbug_end]"),
+            "severity": extract_line_based_content(analysis, "[newt_severity_start]", "[newt_severity_end]"),
+            "description": extract_line_based_content(analysis, "[newt_description_start]", "[newt_description_end]"),
+            "recommendation": extract_line_based_content(analysis, "[newt_recommendation_start]", "[newt_recommendation_end]"),
         }
         return analysis_object.get('is_bug', False), analysis_object
 
