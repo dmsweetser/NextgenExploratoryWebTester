@@ -149,28 +149,39 @@ class BotThread(threading.Thread):
 
         Current URL: {context['current_url']}
 
-        What should your next action be? Respond with a JSON object containing:
-        - "action": The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
-        - "element": The CSS selector for the element to interact with
-        - "value": For fill/select actions, the value to fill (if needed)
-        - "reasoning": Brief explanation of your choice
 
-        IMPORTANT: 
+        What should your next action be? Respond ONLY with the following:
+        
+        ```
+        [newt_action_start]
+        The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
+        [newt_action_end]
+        [newt_element_start]
+        The CSS selector for the element to interact with
+        [newt_element_end]
+        [newt_value_start]
+        For fill/select actions, the value to fill (if needed)
+        [newt_value_end]
+        [newt_reasoning_start]
+        Brief explanation of your choice
+        [newt_reasoning_end]
+        ```        
+
+        IMPORTANT:
         1) Avoid repeating actions that have already been attempted
         2) Consider the previous bugs and steps to determine a new approach
         3) Use the most specific, unique selector when interacting with an element
 
         THAT'S AN ORDER, SOLDIER!
-
         """
 
         action = self.llm.get_action(prompt)
-
-        # If JSON parsing failed, provide a default action
-        if not isinstance(action, dict):
-            return {}
-
-        return action
+        return {
+            "action": self.llm.extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+            "element": self.llm.extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
+            "value": self.llm.extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
+            "reasoning": self.llm.extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
+        }
 
     def execute_action(self, action, step_number):
         try:
@@ -263,17 +274,35 @@ class BotThread(threading.Thread):
         3. Typos or incorrect text that indicates a problem
         4. Unexpected page states or behaviors
 
-        Respond with JSON containing:
-        - "is_bug": boolean indicating if this is a bug
-        - "severity": "high", "medium", or "low"
-        - "description": detailed explanation of why this is a bug
-        - "recommendation": how to fix or work around this bug
+
+        Respond ONLY with the following:
+
+        ```
+        [newt_isbug_start]
+        True or False
+        [newt_isbug_end]
+        [newt_severity_start]
+        High, Medium or Low
+        [newt_severity_end]
+        [newt_description_start]
+        Detailed explanation of why this is a bug
+        [newt_description_end]
+        [newt_recommendation_start]
+        How to fix or work around this bug
+        [newt_recommendation_end]
+        ```
         """
 
         self.logger.debug(f"Bot {self.bot_id} - Bug detection prompt: {prompt[:500]}...")
         analysis = self.llm.get_action(prompt)
         self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
-        return analysis.get('is_bug', False), analysis
+        analysis_object = {
+            "is_bug": self.llm.extract_line_based_content(action, "[newt_isbug_start]", "[newt_isbug_end]"),
+            "severity": self.llm.extract_line_based_content(action, "[newt_severity_start]", "[newt_severity_end]"),
+            "description": self.llm.extract_line_based_content(action, "[newt_description_start]", "[newt_description_end]"),
+            "recommendation": self.llm.extract_line_based_content(action, "[newt_recommendation_start]", "[newt_recommendation_end]"),
+        }
+        return analysis_object.get('is_bug', False), analysis_object
 
     def report_bug(self, action, result, context, analysis):
         summary = f"NEWT Bug Detected: {analysis['description']}"
@@ -315,19 +344,24 @@ class BotThread(threading.Thread):
         3. Is there any indication that testing should continue?
         4. Have all major functionality areas been covered?
 
-        Respond with JSON containing:
-        - "complete": boolean indicating if testing is complete
-        - "reasoning": detailed explanation of why testing should continue or stop
-        - "next_area": if not complete, suggest the next area to test
+        Respond ONLY with the following:
+
+        ```
+        [newt_iscomplete_start]
+        True or False
+        [newt_iscomplete_end]
+        [newt_reasoning_start]
+        Detailed explanation of why testing should continue or stop
+        [newt_reasoning_end]
+        [newt_nextarea_start]
+        If not complete, suggest the next area to test
+        [newt_nextarea_end]
+        ```
         """
 
         completion_check = self.llm.get_action(prompt)
-
-        # If JSON parsing fails, assume not complete
-        if not isinstance(completion_check, dict):
-            return False
-
-        return completion_check.get('complete', False)
+        parsed_completion_check = self.llm.extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
+        return parsed_completion_check == "True"
 
     def is_same_domain(self, url1, url2):
         from urllib.parse import urlparse

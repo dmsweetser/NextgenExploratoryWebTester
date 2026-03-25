@@ -9,6 +9,14 @@ def extract_code_block(response_content):
     match = re.search(r"```(.*?)```", response_content, re.DOTALL)
     return match.group(1).strip() if match else ""
 
+def extract_line_based_content(response_content, start_marker, end_marker):
+    start = response_content.find(start_marker)
+    end = response_content.find(end_marker)
+    if start != -1 and end != -1:
+        content = response_content[start + len(start_marker):end].strip()
+        return content
+    return ""
+
 
 class LLMFactory:
     def create_llm(self):
@@ -77,14 +85,7 @@ class LocalLlama:
                 process.terminate()
                 break
         process.wait()
-
-        try:
-            import json
-            response_content = extract_code_block(response_content)
-            response_content = response_content.replace('json\n','')
-            return json.loads(response_content)
-        except json.JSONDecodeError:
-            return response_content
+        return response_content
 
 class AzureFoundry:
     def __init__(self):
@@ -132,10 +133,4 @@ class AzureFoundry:
 
         response.close()
 
-        try:
-            import json
-            response_content = extract_code_block(response_content)
-            response_content = response_content.replace('json\n','')
-            return json.loads(response_content)
-        except json.JSONDecodeError:
-            return response_content
+        return response_content
