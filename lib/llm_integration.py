@@ -10,12 +10,15 @@ def extract_code_block(response_content):
     return match.group(1).strip() if match else ""
 
 def extract_line_based_content(response_content, start_marker, end_marker):
-    start = response_content.find(start_marker)
-    end = response_content.find(end_marker)
-    if start != -1 and end != -1:
-        content = response_content[start + len(start_marker):end].strip()
-        return content
-    return ""
+    try:
+        start = response_content.find(start_marker)
+        end = response_content.find(end_marker)
+        if start != -1 and end != -1:
+            content = response_content[start + len(start_marker):end].strip()
+            return content
+        return ""
+    except Exception as e:
+        return ""
 
 
 class LLMFactory:
