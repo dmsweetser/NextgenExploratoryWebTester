@@ -28,6 +28,8 @@ fi
 
 echo "Virtual environment activated."
 
+pip install --upgrade pip
+
 # --- Install Python deps (non-llama) ---
 if [ -f requirements.txt ]; then
     pip install -r requirements.txt
