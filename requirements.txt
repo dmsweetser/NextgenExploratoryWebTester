@@ -9,3 +9,4 @@ pdfkit
 python-dotenv
 psutil
 werkzeug
+pdfgen
