@@ -19,7 +19,7 @@ class ScreenshotCapturer:
             time.sleep(0.5)
         else:
             # Use a smaller viewport for thumbnail
-            driver.set_window_size(800, 600)
+            driver.set_window_size(200, 150)
 
         driver.save_screenshot(screenshot_path)
         return screenshot_path

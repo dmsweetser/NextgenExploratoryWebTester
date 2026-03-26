@@ -244,6 +244,8 @@ class BotThread(threading.Thread):
             full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_full.png", full_size=True)
             thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_thumb.png", full_size=False)
 
+            self.unhighlight_element(element)
+
             self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), thumbnail_screenshot_path)
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
@@ -386,4 +388,13 @@ class BotThread(threading.Thread):
         self.driver.execute_script("""
             arguments[0].style.border = '3px solid #ff0000';
             arguments[0].style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
+        """, element)
+
+    def unhighlight_element(self, element):
+        """Highlight an element to make it visible in the screenshot"""
+
+        # Add highlighting style
+        self.driver.execute_script("""
+            arguments[0].style.border = '';
+            arguments[0].style.boxShadow = '';
         """, element)

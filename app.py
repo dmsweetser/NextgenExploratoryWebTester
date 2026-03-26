@@ -188,6 +188,9 @@ def generate_pdf(html_content):
             'margin-right': '0.75in',
             'margin-bottom': '0.75in',
             'margin-left': '0.75in',
+            'enable-local-file-access': None,
+            'no-stop-slow-scripts': None,
+            'javascript-delay': '200'
         }
         return pdfkit.from_string(html_content, False, options=options)
     except Exception as e:

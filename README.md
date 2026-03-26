@@ -19,6 +19,7 @@ NEWT (Next-gen Exploratory Web Tester) is an advanced automated web testing syst
 - Git
 - CMake (for building llama.cpp)
 - Chrome/Chromium browser
+- WKHTMLTOPDF - https://wkhtmltopdf.org/downloads.html
 
 ### Setup
 
