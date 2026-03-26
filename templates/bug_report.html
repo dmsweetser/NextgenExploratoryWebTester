@@ -70,7 +70,7 @@
         <ol class="steps-list">
             {% for step in steps %}
             <li>
-                <strong>{{ step[3] }}</strong>
+                <strong>{{ step[8] if step[8] else step[3] }}</strong>
                 {% if step[4] %}<br><small>Element: {{ step[4] }}</small>{% endif %}
                 {% if step[5] %}
                 <br>

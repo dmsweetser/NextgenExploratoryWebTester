@@ -85,7 +85,7 @@
             <div class="timeline-item">
                 <div class="timeline-point"></div>
                 <div class="timeline-content">
-                    <h6 class="timeline-title">{{ step[7] if step[7] else step[3] }}</h6>
+                    <h6 class="timeline-title">{{ step[8] if step[8] else step[3] }}</h6>
                     <p class="timeline-time">{{ step[6] }}</p>
                     {% if step[5] %}
                     <a href="#"
@@ -104,7 +104,7 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card mb-4">
     <div class="card-header">
         <i class="bi bi-bug"></i> NEWT Bugs Found
     </div>
@@ -152,4 +152,18 @@
         {% endif %}
     </div>
 </div>
+
+{% if bot[4] == 'completed' %}
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-check-circle"></i> NEWT Test Conclusion
+    </div>
+    <div class="card-body">
+        <div class="alert alert-success">
+            <h5>Testing Complete</h5>
+            <p>The NEWT bot has completed its testing cycle. Review the steps taken and any bugs found above.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

@@ -190,12 +190,24 @@ def generate_pdf(html_content):
             'margin-left': '0.75in',
             'enable-local-file-access': None,
             'no-stop-slow-scripts': None,
-            'javascript-delay': '200'
+            'javascript-delay': '200',
+            'quiet': ''
         }
         return pdfkit.from_string(html_content, False, options=options)
     except Exception as e:
         logger.error(f"Error generating PDF: {str(e)}")
-        raise
+        # Fallback to plain text if PDF generation fails
+        from io import BytesIO
+        from reportlab.pdfgen import canvas
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer)
+        p.drawString(100, 750, "NEWT Bug Report - PDF Generation Failed")
+        p.drawString(100, 730, f"Error: {str(e)}")
+        p.drawString(100, 710, "Please check wkhtmltopdf installation and configuration.")
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        return buffer
 
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):

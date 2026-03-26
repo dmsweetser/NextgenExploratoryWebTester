@@ -241,12 +241,17 @@ class BotThread(threading.Thread):
             self.handle_alerts()
 
             # Capture large screenshot and save both full and thumbnail versions
-            full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_full.png", full_size=True)
-            thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_thumb.png", full_size=False)
+            try:
+                full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_full.png", full_size=True)
+                thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_thumb.png", full_size=False)
+            except Exception as e:
+                self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
+                full_screenshot_path = None
+                thumbnail_screenshot_path = None
 
             self.unhighlight_element(element)
 
-            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), thumbnail_screenshot_path)
+            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), thumbnail_screenshot_path, action.get('friendly_description', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             # Store full screenshot path for later use
@@ -259,7 +264,7 @@ class BotThread(threading.Thread):
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
             full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}_full.png", full_size=True)
             thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}_thumb.png", full_size=False)
-            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), thumbnail_screenshot_path)
+            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), thumbnail_screenshot_path, None)
             return {'success': False, 'screenshot': full_screenshot_path}
 
     def detect_bug(self, action, result):
