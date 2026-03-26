@@ -83,6 +83,7 @@ class BotThread(threading.Thread):
                         'action': action['action'],
                         'element': action.get('element', ''),
                         'value': action.get('value', ''),
+                        'friendly_description': action.get('friendly_description', ''),
                         'screenshot': result['screenshot']
                     })
                     step_number += 1
@@ -151,7 +152,7 @@ class BotThread(threading.Thread):
 
 
         What should your next action be? Respond ONLY with the following:
-        
+
         ```
         [newt_action_start]
         The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
@@ -162,6 +163,9 @@ class BotThread(threading.Thread):
         [newt_value_start]
         For fill/select actions, the value to fill (if needed)
         [newt_value_end]
+        [newt_friendly_description_start]
+        A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
+        [newt_friendly_description_end]
         [newt_reasoning_start]
         Brief explanation of your choice
         [newt_reasoning_end]
@@ -180,6 +184,7 @@ class BotThread(threading.Thread):
             "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
             "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
             "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
+            "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
             "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
         }
 
