@@ -6,12 +6,29 @@
         <h1 class="h2">Dashboard</h1>
     </div>
 
+    {% set active_bots = [] %}
+    {% set completed_bots = [] %}
+    {% set all_bugs = [] %}
+    {% for bot in bots %}
+        {% if bot[4] == 'running' %}
+            {% set active_bots = active_bots.append(bot) %}
+        {% elif bot[4] == 'completed' or bot[4] == 'stopped' %}
+            {% set completed_bots = completed_bots.append(bot) %}
+        {% endif %}
+    {% endfor %}
+
+    {% set all_bugs_count = 0 %}
+    {% for bot in bots %}
+        {% set bugs = db.get_bugs(bot[0]) %}
+        {% set all_bugs_count = all_bugs_count + bugs|length %}
+    {% endfor %}
+
     <div class="row mb-3">
         <div class="col-md-4">
             <div class="card text-white bg-primary mb-3">
                 <div class="card-header">Active Bots</div>
                 <div class="card-body">
-                    <h5 class="card-title">0</h5>
+                    <h5 class="card-title">{{ active_bots|length }}</h5>
                     <p class="card-text">Currently running bots</p>
                 </div>
             </div>
@@ -20,8 +37,8 @@
             <div class="card text-white bg-success mb-3">
                 <div class="card-header">Completed Bots</div>
                 <div class="card-body">
-                    <h5 class="card-title">{{ bots|length }}</h5>
-                    <p class="card-text">Total bots completed</p>
+                    <h5 class="card-title">{{ completed_bots|length }}</h5>
+                    <p class="card-text">Total bots completed or stopped</p>
                 </div>
             </div>
         </div>
@@ -29,7 +46,7 @@
             <div class="card text-white bg-warning mb-3">
                 <div class="card-header">Bugs Found</div>
                 <div class="card-body">
-                    <h5 class="card-title">0</h5>
+                    <h5 class="card-title">{{ all_bugs_count }}</h5>
                     <p class="card-text">Total bugs reported</p>
                 </div>
             </div>
@@ -41,7 +58,36 @@
             <i class="bi bi-robot"></i> Active NEWT Bots
         </div>
         <div class="card-body">
-            <p class="text-muted">No active NEWT bots at the moment.</p>
+            {% if active_bots %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>NEWT Bot Name</th>
+                                <th>Start URL</th>
+                                <th>Last Activity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bot in active_bots %}
+                            <tr>
+                                <td>{{ bot[1] }}</td>
+                                <td><a href="{{ bot[2] }}" target="_blank" class="text-decoration-none">{{ bot[2] }}</a></td>
+                                <td>{{ bot[5] }}</td>
+                                <td>
+                                    <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View NEWT Results
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">No active NEWT bots at the moment.</p>
+            {% endif %}
         </div>
     </div>
 
@@ -67,7 +113,7 @@
                             <td>{{ bot[1] }}</td>
                             <td><a href="{{ bot[2] }}" target="_blank" class="text-decoration-none">{{ bot[2] }}</a></td>
                             <td>
-                                <span class="badge bg-{% if bot[4] == 'completed' %}success{% elif bot[4] == 'running' %}primary{% else %}secondary{% endif %}">
+                                <span class="badge bg-{% if bot[4] == 'running' %}primary{% elif bot[4] == 'completed' %}success{% elif bot[4] == 'stopped' %}warning{% elif bot[4] == 'removed' %}secondary{% else %}info{% endif %}">
                                     {{ bot[4] }}
                                 </span>
                             </td>

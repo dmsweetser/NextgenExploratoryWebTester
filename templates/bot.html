@@ -85,11 +85,14 @@
             <div class="timeline-item">
                 <div class="timeline-point"></div>
                 <div class="timeline-content">
-                    <h6 class="timeline-title">{{ step[3] }}</h6>
+                    <h6 class="timeline-title">{{ step[7] if step[7] else step[3] }}</h6>
                     <p class="timeline-time">{{ step[6] }}</p>
                     {% if step[5] %}
-                    <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}"
-                        class="img-thumbnail full-page-screenshot" alt="NEWT step screenshot">
+                    <a href="#"
+                        onclick="showLargeImage('{{ url_for('static', filename=step[5].replace('static/', '').replace('_thumb', '_full')) }}'); return false;">
+                        <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}"
+                            class="img-thumbnail full-page-screenshot" alt="NEWT step screenshot">
+                    </a>
                     {% endif %}
                 </div>
             </div>
