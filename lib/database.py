@@ -25,6 +25,7 @@ class Database:
                       element TEXT,
                       screenshot_path TEXT,
                       friendly_description TEXT,
+                      success BOOLEAN DEFAULT TRUE,
                       timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
                       FOREIGN KEY(bot_id) REFERENCES bots(id))''')
 
@@ -84,11 +85,11 @@ class Database:
         conn.commit()
         conn.close()
 
-    def add_step(self, bot_id, step_number, action, element, screenshot_path, friendly_description):
+    def add_step(self, bot_id, step_number, action, element, screenshot_path, friendly_description, success=True):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_path, friendly_description) VALUES (?, ?, ?, ?, ?, ?)",
-                 (bot_id, step_number, action, element, screenshot_path, friendly_description))
+        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_path, friendly_description, success) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                 (bot_id, step_number, action, element, screenshot_path, friendly_description, success))
         conn.commit()
         conn.close()
 

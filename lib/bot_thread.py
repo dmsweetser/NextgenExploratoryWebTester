@@ -77,27 +77,25 @@ class BotThread(threading.Thread):
 
                 # Execute action
                 result = self.execute_action(action, step_number)
-                if result['success']:
-                    self.steps_taken.append({
-                        'step': step_number,
-                        'action': action['action'],
-                        'element': action.get('element', ''),
-                        'value': action.get('value', ''),
-                        'friendly_description': action.get('friendly_description', ''),
-                        'screenshot': result['screenshot']
-                    })
-                    step_number += 1
+                self.steps_taken.append({
+                    'step': step_number,
+                    'action': action['action'],
+                    'element': action.get('element', ''),
+                    'value': action.get('value', ''),
+                    'friendly_description': action.get('friendly_description', ''),
+                    'screenshot': result['screenshot'],
+                    'success': result['success']
+                })
+                step_number += 1
 
-                    # Check for bugs
-                    analysis_result, analysis = self.detect_bug(action, result)
-                    if analysis_result:
-                        bug_id = self.report_bug(action, result, context, analysis)
-                        known_bugs.append(self.db.get_knowledge_for_bug(bug_id))
+                # Check for bugs
+                analysis_result, analysis = self.detect_bug(action, result)
+                if analysis_result:
+                    bug_id = self.report_bug(action, result, context, analysis)
+                    known_bugs.append(self.db.get_knowledge_for_bug(bug_id))
 
-                    # Update simplified HTML
-                    simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-                else:
-                    break
+                # Update simplified HTML
+                simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
 
                 # Check if directive is complete
                 if self.is_directive_complete():
@@ -150,6 +148,8 @@ class BotThread(threading.Thread):
 
         Current URL: {context['current_url']}
 
+        Previous action status:
+        {'SUCCESS' if context['steps_taken'][-1]['success'] else 'FAILED'}
 
         What should your next action be? Respond ONLY with the following:
 
@@ -167,20 +167,21 @@ class BotThread(threading.Thread):
         A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
         [newt_friendly_description_end]
         [newt_reasoning_start]
-        Brief explanation of your choice
+        Brief explanation of your choice, considering any previous failures
         [newt_reasoning_end]
         ```        
 
         IMPORTANT:
-        1) Avoid repeating actions that have already been attempted
-        2) Consider the previous bugs and steps to determine a new approach
-        3) Use the most specific, unique selector when interacting with an element
+        1) If the previous action failed, choose a different approach or try a similar action with a different selector
+        2) Avoid repeating actions that have already been attempted
+        3) Consider the previous bugs and steps to determine a new approach
+        4) Use the most specific, unique selector when interacting with an element
 
         THAT'S AN ORDER, SOLDIER!
         """
 
         action = self.llm.get_action(prompt)
-        return {
+        action_dict = {
             "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
             "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
             "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
@@ -188,11 +189,19 @@ class BotThread(threading.Thread):
             "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
         }
 
-    def execute_action(self, action, step_number):
-        try:
-            element = None
-            action_text = ""
+        # If previous action failed and we're not waiting, add a small wait to allow page to stabilize
+        if context['steps_taken'] and not context['steps_taken'][-1]['success'] and action_dict['action'] not in ['wait', 'get_select_values']:
+            action_dict['action'] = 'wait'
+            action_dict['value'] = '2'
+            action_dict['friendly_description'] = 'Wait to allow page to stabilize after previous failure'
 
+        return action_dict
+
+    def execute_action(self, action, step_number):
+        element = None
+        action_text = ""
+
+        try:
             if action['action'] == 'click':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Clicked {action['element']}"
@@ -229,14 +238,18 @@ class BotThread(threading.Thread):
             elif action['action'] == 'wait':
                 time.sleep(int(action['value']))
                 action_text = f"Waited for {action['value']} seconds"
-                return {'success': True, 'screenshot': None}
+                # No element to highlight/unhighlight for wait action
+                # Store full screenshot path for later use
+                result = {'success': True, 'screenshot': None}
+                return result
             elif action['action'] == 'get_select_values':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Got select values from {action['element']}"
                 select = Select(element)
                 options = [{'text': option.text, 'value': option.get_attribute('value')} for option in select.options]
                 self.db.add_step(self.bot_id, step_number, action_text, action['element'], None)
-                return {'success': True, 'screenshot': None}
+                result = {'success': True, 'screenshot': None}
+                return result
 
             self.handle_alerts()
 
