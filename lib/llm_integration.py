@@ -5,6 +5,22 @@ import os
 import time
 from lib.config import Config
 
+def extract_code_block(response_content):
+    match = re.search(r"```(.*?)```", response_content, re.DOTALL)
+    return match.group(1).strip() if match else ""
+
+def extract_line_based_content(response_content, start_marker, end_marker):
+    try:
+        start = response_content.find(start_marker)
+        end = response_content.find(end_marker)
+        if start != -1 and end != -1:
+            content = response_content[start + len(start_marker):end].strip()
+            return content
+        return ""
+    except Exception as e:
+        return ""
+
+
 class LLMFactory:
     def create_llm(self):
         if Config.use_local_model():
@@ -72,22 +88,7 @@ class LocalLlama:
                 process.terminate()
                 break
         process.wait()
-
-        def extract_code_block(response_content):
-            match = re.search(r"```(.*?)```", response_content, re.DOTALL)
-            return match.group(1).strip() if match else ""
-
-        try:
-            import json
-            response_content = extract_code_block(response_content)
-            return json.loads(response_content)
-        except json.JSONDecodeError:
-            return {
-                "action": "click",
-                "element": "button.btn-primary",
-                "value": "",
-                "reasoning": "Fallback action due to JSON parsing error - clicking primary button"
-            }
+        return response_content
 
 class AzureFoundry:
     def __init__(self):
@@ -135,13 +136,4 @@ class AzureFoundry:
 
         response.close()
 
-        try:
-            import json
-            return json.loads(response_content)
-        except json.JSONDecodeError:
-            return {
-                "action": "wait",
-                "element": "",
-                "value": "2",
-                "reasoning": "Fallback action due to JSON parsing error"
-            }
+        return response_content

@@ -62,5 +62,7 @@ cd ../..
 echo "llama.cpp built successfully."
 echo "Binary located at: llama.cpp/build/bin/llama-cli"
 
+sudo apt-get install wkhtmltopdf
+
 echo "Setup complete."
 echo "To activate the virtual environment later: source venv/bin/activate"
