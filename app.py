@@ -198,7 +198,7 @@ def generate_pdf(html_content):
         logger.error(f"Error generating PDF: {str(e)}")
         # Fallback to plain text if PDF generation fails
         from io import BytesIO
-        from reportlab.pdfgen import canvas
+        from pdfgen import canvas
         buffer = BytesIO()
         p = canvas.Canvas(buffer)
         p.drawString(100, 750, "NEWT Bug Report - PDF Generation Failed")
