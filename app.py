@@ -102,13 +102,64 @@ def export_bug(bug_id):
     steps = db.get_steps(bug[1])
     knowledge = db.get_knowledge_for_bug(bug_id)
 
-    html = render_template('bug_report.html', bug=bug, steps=steps, knowledge=knowledge)
-    pdf = generate_pdf(html)
+    # Create HTML with embedded images
+    html_content = render_template('bug_report.html', bug=bug, steps=steps, knowledge=knowledge, embed_images=True)
+
+    # Create JSON data
+    json_data = {
+        'bug_id': bug[0],
+        'bot_id': bug[1],
+        'bot_name': bug[9],
+        'summary': bug[2],
+        'status': bug[6],
+        'reported_at': bug[7],
+        'resolved_at': bug[8],
+        'steps': steps,
+        'knowledge': knowledge,
+        'screenshot_path': bug[5]
+    }
+
+    # Create text summary
+    text_summary = f"Bug #{bug[0]} - {bug[2]}\n"
+    text_summary += f"Bot: {bug[9]}\n"
+    text_summary += f"Status: {bug[6]}\n"
+    text_summary += f"Reported: {bug[7]}\n"
+    text_summary += "\nSteps:\n"
+    for step in steps:
+        text_summary += f"- Step {step[2]}: {step[3]}\n"
+    text_summary += "\nKnowledge:\n"
+    text_summary += knowledge
+
+    # Create ZIP file
+    from io import BytesIO
+    from zipfile import ZipFile
+    import base64
+
+    zip_buffer = BytesIO()
+    with ZipFile(zip_buffer, 'w') as zip_file:
+        # Add HTML report
+        zip_file.writestr('bug_report.html', html_content)
+
+        # Add JSON data
+        zip_file.writestr('bug_data.json', json.dumps(json_data, indent=2))
+
+        # Add text summary
+        zip_file.writestr('bug_summary.txt', text_summary)
+
+        # Add screenshot if available
+        if bug[5]:
+            try:
+                with open(bug[5], 'rb') as img_file:
+                    zip_file.writestr('screenshot.png', img_file.read())
+            except Exception as e:
+                logger.error(f"Error adding screenshot to ZIP: {str(e)}")
+
+    zip_buffer.seek(0)
     return send_file(
-        pdf,
-        mimetype='application/pdf',
+        zip_buffer,
+        mimetype='application/zip',
         as_attachment=True,
-        download_name=f'bug_report_{bug_id}.pdf'
+        download_name=f'bug_report_{bug_id}.zip'
     )
 
 @app.route('/stop/<int:bot_id>', methods=['POST'])
@@ -178,36 +229,6 @@ def run_self_test():
 @app.route('/test-website')
 def test_website():
     return render_template('test_website.html')
-
-def generate_pdf(html_content):
-    try:
-        import pdfkit
-        options = {
-            'page-size': 'A4',
-            'margin-top': '0.75in',
-            'margin-right': '0.75in',
-            'margin-bottom': '0.75in',
-            'margin-left': '0.75in',
-            'enable-local-file-access': None,
-            'no-stop-slow-scripts': None,
-            'javascript-delay': '200',
-            'quiet': ''
-        }
-        return pdfkit.from_string(html_content, False, options=options)
-    except Exception as e:
-        logger.error(f"Error generating PDF: {str(e)}")
-        # Fallback to plain text if PDF generation fails
-        from io import BytesIO
-        from pdfgen import canvas
-        buffer = BytesIO()
-        p = canvas.Canvas(buffer)
-        p.drawString(100, 750, "NEWT Bug Report - PDF Generation Failed")
-        p.drawString(100, 730, f"Error: {str(e)}")
-        p.drawString(100, 710, "Please check wkhtmltopdf installation and configuration.")
-        p.showPage()
-        p.save()
-        buffer.seek(0)
-        return buffer
 
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):

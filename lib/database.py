@@ -35,6 +35,7 @@ class Database:
                       summary TEXT,
                       steps TEXT,
                       screenshot_path TEXT,
+                      screenshot_data BLOB,
                       status TEXT DEFAULT 'new',
                       resolved_at TEXT,
                       FOREIGN KEY(bot_id) REFERENCES bots(id))''')
@@ -101,11 +102,11 @@ class Database:
         conn.close()
         return steps
 
-    def add_bug(self, bot_id, summary, steps, screenshot_path):
+    def add_bug(self, bot_id, summary, steps, screenshot_path, screenshot_data=None):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_path) VALUES (?, ?, ?, ?)",
-                 (bot_id, summary, steps, screenshot_path))
+        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_path, screenshot_data) VALUES (?, ?, ?, ?, ?)",
+                 (bot_id, summary, steps, screenshot_path, screenshot_data))
         conn.commit()
         bug_id = c.lastrowid
         conn.close()

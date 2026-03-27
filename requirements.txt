@@ -5,9 +5,8 @@ dotenv
 flask
 selenium
 beautifulsoup4
-pdfkit
 python-dotenv
 psutil
 werkzeug
-pdfgen
 six
+zipfile36
