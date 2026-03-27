@@ -149,7 +149,7 @@ class BotThread(threading.Thread):
         Current URL: {context['current_url']}
 
         Previous action status:
-        {'SUCCESS' if context['steps_taken'][-1]['success'] else 'FAILED'}
+        {'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED'}
 
         What should your next action be? Respond ONLY with the following:
 
