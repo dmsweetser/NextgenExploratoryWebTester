@@ -99,19 +99,11 @@
         <ol class="steps-list">
             {% for step in steps %}
             <li>
-                <strong>{{ step[8] if step[8] else step[3] }}</strong>
+                <strong>{{ step[8] if step[8] and step[8] != '' else step[3] }}</strong>
                 {% if step[4] %}<br><small>Element: {{ step[4] }}</small>{% endif %}
                 {% if step[5] %}
                 <br>
-                {% if embed_images %}
-                {% set img_data = step[5] | replace('static/', '') %}
-                {% set full_path = url_for('static', filename=img_data) %}
-                <img src="{{ full_path }}" class="screenshot" alt="Step screenshot" onclick="showFullImage('{{ full_path }}')">
-                {% else %}
-                <a href="{{ url_for('static', filename=step[5].replace('static/', '')) }}">
-                    <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}" class="screenshot" alt="Step screenshot">
-                </a>
-                {% endif %}
+                <img src="data:image/png;base64,{{ step[5] }}" class="screenshot" alt="Step screenshot" onclick="showFullImage('data:image/png;base64,{{ step[5] }}')">
                 {% endif %}
             </li>
             {% endfor %}
@@ -126,15 +118,7 @@
     <div class="section">
         <h2 class="section-title">Screenshot</h2>
         {% if bug[5] %}
-        {% if embed_images %}
-        {% set img_data = bug[5] | replace('static/', '') %}
-        {% set full_path = url_for('static', filename=img_data) %}
-        <img src="{{ full_path }}" class="screenshot" alt="Bug screenshot" onclick="showFullImage('{{ full_path }}')">
-        {% else %}
-        <a href="{{ url_for('static', filename=bug[5].replace('static/','')) }}">
-            <img src="{{ url_for('static', filename=bug[5].replace('static/','')) }}" class="screenshot" alt="Bug screenshot">
-        </a>
-        {% endif %}
+        <img src="data:image/png;base64,{{ bug[5] }}" class="screenshot" alt="Bug screenshot" onclick="showFullImage('data:image/png;base64,{{ bug[5] }}')">
         {% else %}
         <p>No screenshot available</p>
         {% endif %}

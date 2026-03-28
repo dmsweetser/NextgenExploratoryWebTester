@@ -27,6 +27,27 @@ document.querySelectorAll('form').forEach(function(form) {
     });
 });
 
+// Restore scroll position on page load
+if (localStorage.getItem('scrollPosition')) {
+    setTimeout(function() {
+        var mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            mainContent.scrollTop = parseInt(localStorage.getItem('scrollPosition'));
+            localStorage.removeItem('scrollPosition');
+        }
+    }, 100);
+}
+
+// Save scroll position before unload (if not completed)
+window.addEventListener('beforeunload', function() {
+    if (!document.getElementById('testCompleteAlert')) {
+        var mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            localStorage.setItem('scrollPosition', mainContent.scrollTop);
+        }
+    }
+});
+
 // Self-test modal
 document.addEventListener('DOMContentLoaded', function() {
     var selfTestModal = document.getElementById('selfTestModal');

@@ -102,11 +102,11 @@ class Database:
         conn.close()
         return steps
 
-    def add_bug(self, bot_id, summary, steps, screenshot_path, screenshot_data=None):
+    def add_bug(self, bot_id, summary, steps, screenshot_data=None):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_path, screenshot_data) VALUES (?, ?, ?, ?, ?)",
-                 (bot_id, summary, steps, screenshot_path, screenshot_data))
+        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_data) VALUES (?, ?, ?, ?)",
+                 (bot_id, summary, steps, screenshot_data))
         conn.commit()
         bug_id = c.lastrowid
         conn.close()
@@ -134,7 +134,7 @@ class Database:
         c.execute("SELECT b.*, bt.name as bot_name FROM bugs b JOIN bots bt ON b.bot_id = bt.id WHERE b.id = ?", (bug_id,))
         bug = c.fetchone()
         conn.close()
-        return bug
+        return bug if bug else None
 
     def resolve_bug(self, bug_id):
         conn = sqlite3.connect('data/bots.db')

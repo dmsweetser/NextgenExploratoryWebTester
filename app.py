@@ -99,6 +99,8 @@ def resolve_bug(bug_id):
 @app.route('/bug/<int:bug_id>/export')
 def export_bug(bug_id):
     bug = db.get_bug_with_bot_name(bug_id)
+    if not bug:
+        return redirect(url_for('bugs'))
     steps = db.get_steps(bug[1])
     knowledge = db.get_knowledge_for_bug(bug_id)
 
@@ -109,11 +111,11 @@ def export_bug(bug_id):
     json_data = {
         'bug_id': bug[0],
         'bot_id': bug[1],
-        'bot_name': bug[9],
+        'bot_name': bug[9] if len(bug) > 9 else 'Unknown Bot',
         'summary': bug[2],
         'status': bug[6],
         'reported_at': bug[7],
-        'resolved_at': bug[8],
+        'resolved_at': bug[8] if len(bug) > 8 else None,
         'steps': steps,
         'knowledge': knowledge,
         'screenshot_path': bug[5]

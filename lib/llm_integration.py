@@ -20,6 +20,16 @@ def extract_line_based_content(response_content, start_marker, end_marker):
     except Exception as e:
         return ""
 
+def write_prompt_response_logs(prompt, response, bot_id):
+    if Config.get_log_prompts():
+        ticks = int(time.time() * 1000)
+        prompt_filename = f"data/bot_{bot_id}_{ticks}_prompt.txt"
+        response_filename = f"data/bot_{bot_id}_{ticks}_response.txt"
+        with open(prompt_filename, "w") as f:
+            f.write(prompt)
+        with open(response_filename, "w") as f:
+            f.write(response)
+
 
 class LLMFactory:
     def create_llm(self):
@@ -32,7 +42,7 @@ class LocalLlama:
     def __init__(self):
         self.response_file = "data/response.log"
 
-    def get_action(self, prompt):
+    def get_action(self, prompt, bot_id=None):
         model_path = Config.get_model_path()
         if not model_path:
             raise ValueError("MODEL_PATH not configured")
@@ -88,6 +98,13 @@ class LocalLlama:
                 process.terminate()
                 break
         process.wait()
+
+        if bot_id is not None and Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/bot_{bot_id}_{ticks}_response.txt"
+            with open(response_filename, "w") as f:
+                f.write(response_content)
+
         return response_content
 
 class AzureFoundry:
@@ -112,7 +129,7 @@ class AzureFoundry:
             api_version="2024-05-01-preview"
         )
 
-    def get_action(self, prompt):
+    def get_action(self, prompt, bot_id=None):
         from azure.ai.inference.models import SystemMessage, UserMessage
 
         response = self.client.complete(
@@ -135,5 +152,11 @@ class AzureFoundry:
                 break
 
         response.close()
+
+        if bot_id is not None and Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/bot_{bot_id}_{ticks}_response.txt"
+            with open(response_filename, "w") as f:
+                f.write(response_content)
 
         return response_content

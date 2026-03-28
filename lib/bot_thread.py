@@ -241,7 +241,7 @@ class BotThread(threading.Thread):
                 # No element to highlight/unhighlight for wait action
                 # Capture screenshot
                 try:
-                    full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}.png", full_size=True)
+                    full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
                 except Exception as e:
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                     full_screenshot_path = None
@@ -259,7 +259,7 @@ class BotThread(threading.Thread):
                 options = [{'text': option.text, 'value': option.get_attribute('value')} for option in select.options]
                 # Capture screenshot
                 try:
-                    full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}.png", full_size=True)
+                    full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
                 except Exception as e:
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                     full_screenshot_path = None
@@ -274,7 +274,7 @@ class BotThread(threading.Thread):
 
             # Capture screenshot
             try:
-                full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}.png", full_size=True)
+                full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                 full_screenshot_path = None
@@ -292,7 +292,7 @@ class BotThread(threading.Thread):
             error_msg = f"Failed to {action['action']} element {action.get('element', '')}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
-            full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}.png", full_size=True)
+            full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
             self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_path, None)
             return {'success': False, 'screenshot': full_screenshot_path}
 
@@ -340,8 +340,21 @@ class BotThread(threading.Thread):
         ```
         """
 
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            prompt_filename = f"data/prompt_bot_{self.bot_id}_{ticks}.txt"
+            with open(prompt_filename, "w") as f:
+                f.write(prompt)
+
         self.logger.debug(f"Bot {self.bot_id} - Bug detection prompt: {prompt[:500]}...")
         analysis = self.llm.get_action(prompt)
+
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/response_bot_{self.bot_id}_{ticks}.txt"
+            with open(response_filename, "w") as f:
+                f.write(analysis)
+
         self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
         analysis_object = {
             "is_bug": extract_line_based_content(analysis, "[newt_isbug_start]", "[newt_isbug_end]"),
@@ -364,7 +377,7 @@ class BotThread(threading.Thread):
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error reading screenshot: {str(e)}")
 
-        bug_id = self.db.add_bug(self.bot_id, summary, steps, result['screenshot'], screenshot_data)
+        bug_id = self.db.add_bug(self.bot_id, summary, steps, screenshot_data)
         knowledge = analysis["description"] + chr(10) + analysis["recommendation"]
         self.db.add_knowledge(bug_id, knowledge)
 
@@ -408,7 +421,20 @@ class BotThread(threading.Thread):
         ```
         """
 
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            prompt_filename = f"data/prompt_bot_{self.bot_id}_{ticks}.txt"
+            with open(prompt_filename, "w") as f:
+                f.write(prompt)
+
         completion_check = self.llm.get_action(prompt)
+
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/response_bot_{self.bot_id}_{ticks}.txt"
+            with open(response_filename, "w") as f:
+                f.write(completion_check)
+
         parsed_completion_check = extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
         return parsed_completion_check == "True"
 

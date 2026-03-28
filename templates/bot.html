@@ -88,9 +88,7 @@
                     <h6 class="timeline-title">{{ step[8] if step[8] else step[3] }}</h6>
                     <p class="timeline-time">{{ step[6] }}</p>
                     {% if step[5] %}
-                    <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}"
-                        class="img-thumbnail full-page-screenshot" alt="NEWT step screenshot"
-                        onclick="showLargeImage('{{ url_for('static', filename=step[5].replace('static/', '')) }}')">
+                        <img src="data:image/png;base64,{{ step[5] }}" class="img-thumbnail full-page-screenshot" alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step[5] }}')">
                     {% endif %}
                 </div>
             </div>
