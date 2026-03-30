@@ -7,10 +7,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-    // Auto-refresh for bot status
+    // Auto-refresh for bot status via AJAX
     if (document.querySelector('.timeline')) {
-        setTimeout(function() {
-            window.location.reload();
+        setInterval(function() {
+            const botId = window.location.pathname.split('/').pop();
+            fetch(`/bot/${botId}`)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newContent = doc.querySelector('.timeline').innerHTML;
+                    document.querySelector('.timeline').innerHTML = newContent;
+                })
+                .catch(error => console.error('Error refreshing content:', error));
         }, 5000);
     }
 });
@@ -27,6 +36,27 @@ document.querySelectorAll('form').forEach(function(form) {
     });
 });
 
+// Restore scroll position on page load
+if (localStorage.getItem('scrollPosition')) {
+    setTimeout(function() {
+        var mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            mainContent.scrollTop = parseInt(localStorage.getItem('scrollPosition'));
+            localStorage.removeItem('scrollPosition');
+        }
+    }, 100);
+}
+
+// Save scroll position before unload (if not completed)
+window.addEventListener('beforeunload', function() {
+    if (!document.getElementById('testCompleteAlert')) {
+        var mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            localStorage.setItem('scrollPosition', mainContent.scrollTop);
+        }
+    }
+});
+
 // Self-test modal
 document.addEventListener('DOMContentLoaded', function() {
     var selfTestModal = document.getElementById('selfTestModal');
@@ -37,41 +67,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Function to show large image in modal
-function showLargeImage(imageUrl) {
-    // Create modal if it doesn't exist
-    let modal = document.getElementById('imageModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'imageModal';
-        modal.className = 'modal fade';
-        modal.tabIndex = '-1';
-        modal.setAttribute('aria-labelledby', 'imageModalLabel');
-        modal.setAttribute('aria-hidden', 'true');
+// Function to show full-size image
+function showFullImage(src) {
+    const fullImage = document.getElementById('fullImage');
+    const screenshotFull = document.getElementById('screenshotFull');
 
-        modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="imageModalLabel">Full Screenshot</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <img id="largeImage" src="" class="img-fluid" alt="Full screenshot">
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
+    if (fullImage && screenshotFull) {
+        fullImage.src = src;
+        screenshotFull.style.display = 'flex';
     }
+}
 
-    // Set the image source
-    let img = document.getElementById('largeImage');
-    if (img) {
-        img.src = imageUrl;
+// Function to close full-size image
+function closeFullImage() {
+    const screenshotFull = document.getElementById('screenshotFull');
+    if (screenshotFull) {
+        screenshotFull.style.display = 'none';
     }
-
-    // Show the modal
-    let modalInstance = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
-    modalInstance.show();
 }

@@ -5,10 +5,6 @@ import os
 import time
 from lib.config import Config
 
-def extract_code_block(response_content):
-    match = re.search(r"```(.*?)```", response_content, re.DOTALL)
-    return match.group(1).strip() if match else ""
-
 def extract_line_based_content(response_content, start_marker, end_marker):
     try:
         start = response_content.find(start_marker)
@@ -20,7 +16,6 @@ def extract_line_based_content(response_content, start_marker, end_marker):
     except Exception as e:
         return ""
 
-
 class LLMFactory:
     def create_llm(self):
         if Config.use_local_model():
@@ -29,10 +24,8 @@ class LLMFactory:
             return AzureFoundry()
 
 class LocalLlama:
-    def __init__(self):
-        self.response_file = "data/response.log"
-
-    def get_action(self, prompt):
+    
+    def get_action(self, prompt, bot_id=None):
         model_path = Config.get_model_path()
         if not model_path:
             raise ValueError("MODEL_PATH not configured")
@@ -75,9 +68,6 @@ class LocalLlama:
 
         while True:
             token = process.stdout.read(1)
-            if current_iteration % 100 == 0 or not token:
-                with open(self.response_file, 'w', encoding='utf-8') as response_log:
-                    response_log.write(response_content)
             if not token:
                 os.remove(filename)
                 break
@@ -112,7 +102,7 @@ class AzureFoundry:
             api_version="2024-05-01-preview"
         )
 
-    def get_action(self, prompt):
+    def get_action(self, prompt, bot_id=None):
         from azure.ai.inference.models import SystemMessage, UserMessage
 
         response = self.client.complete(
@@ -135,5 +125,4 @@ class AzureFoundry:
                 break
 
         response.close()
-
         return response_content

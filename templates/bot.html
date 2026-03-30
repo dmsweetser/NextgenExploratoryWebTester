@@ -88,11 +88,8 @@
                     <h6 class="timeline-title">{{ step[8] if step[8] else step[3] }}</h6>
                     <p class="timeline-time">{{ step[6] }}</p>
                     {% if step[5] %}
-                    <a href="#"
-                        onclick="showLargeImage('{{ url_for('static', filename=step[5].replace('static/', '').replace('_thumb', '_full')) }}'); return false;">
-                        <img src="{{ url_for('static', filename=step[5].replace('static/', '')) }}"
-                            class="img-thumbnail full-page-screenshot" alt="NEWT step screenshot">
-                    </a>
+                    <img src="data:image/png;base64,{{ step[5] }}" class="screenshot-thumb"
+                        alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step[5] }}')">
                     {% endif %}
                 </div>
             </div>
@@ -164,6 +161,11 @@
             <p>The NEWT bot has completed its testing cycle. Review the steps taken and any bugs found above.</p>
         </div>
     </div>
+</div>
+
+<div class="screenshot-full" id="screenshotFull" onclick="closeFullImage()">
+    <div class="screenshot-full-close" onclick="closeFullImage()">×</div>
+    <img src="" id="fullImage" alt="Full screenshot">
 </div>
 {% endif %}
 {% endblock %}
