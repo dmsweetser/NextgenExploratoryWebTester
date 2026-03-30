@@ -118,7 +118,7 @@ def export_bug(bug_id):
         'resolved_at': bug[8] if len(bug) > 8 else None,
         'steps': steps,
         'knowledge': knowledge,
-        'screenshot_path': bug[5]
+        'screenshot_data': bug[5]
     }
 
     # Create text summary

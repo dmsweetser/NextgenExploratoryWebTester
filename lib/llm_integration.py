@@ -5,10 +5,6 @@ import os
 import time
 from lib.config import Config
 
-def extract_code_block(response_content):
-    match = re.search(r"```(.*?)```", response_content, re.DOTALL)
-    return match.group(1).strip() if match else ""
-
 def extract_line_based_content(response_content, start_marker, end_marker):
     try:
         start = response_content.find(start_marker)
@@ -20,17 +16,6 @@ def extract_line_based_content(response_content, start_marker, end_marker):
     except Exception as e:
         return ""
 
-def write_prompt_response_logs(prompt, response, bot_id):
-    if Config.get_log_prompts():
-        ticks = int(time.time() * 1000)
-        prompt_filename = f"data/bot_{bot_id}_{ticks}_prompt.txt"
-        response_filename = f"data/bot_{bot_id}_{ticks}_response.txt"
-        with open(prompt_filename, "w") as f:
-            f.write(prompt)
-        with open(response_filename, "w") as f:
-            f.write(response)
-
-
 class LLMFactory:
     def create_llm(self):
         if Config.use_local_model():
@@ -39,9 +24,7 @@ class LLMFactory:
             return AzureFoundry()
 
 class LocalLlama:
-    def __init__(self):
-        self.response_file = "data/response.log"
-
+    
     def get_action(self, prompt, bot_id=None):
         model_path = Config.get_model_path()
         if not model_path:
@@ -85,9 +68,6 @@ class LocalLlama:
 
         while True:
             token = process.stdout.read(1)
-            if current_iteration % 100 == 0 or not token:
-                with open(self.response_file, 'w', encoding='utf-8') as response_log:
-                    response_log.write(response_content)
             if not token:
                 os.remove(filename)
                 break
@@ -98,13 +78,6 @@ class LocalLlama:
                 process.terminate()
                 break
         process.wait()
-
-        if bot_id is not None and Config.get_log_prompts():
-            ticks = int(time.time() * 1000)
-            response_filename = f"data/bot_{bot_id}_{ticks}_response.txt"
-            with open(response_filename, "w") as f:
-                f.write(response_content)
-
         return response_content
 
 class AzureFoundry:
@@ -152,11 +125,4 @@ class AzureFoundry:
                 break
 
         response.close()
-
-        if bot_id is not None and Config.get_log_prompts():
-            ticks = int(time.time() * 1000)
-            response_filename = f"data/bot_{bot_id}_{ticks}_response.txt"
-            with open(response_filename, "w") as f:
-                f.write(response_content)
-
         return response_content

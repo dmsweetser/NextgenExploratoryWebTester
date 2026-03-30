@@ -131,13 +131,8 @@ body {
     border-bottom: 2px solid #dee2e6;
 }
 
-.img-thumbnail {
-    max-width: 100%;
-    height: auto;
-}
-
 .full-page-screenshot {
-    max-width: 100%;
+    max-width: 250px;
     height: auto;
     border: 1px solid #ddd;
     margin-top: 10px;
@@ -148,12 +143,6 @@ body {
 
 .full-page-screenshot:hover {
     transform: scale(1.02);
-}
-
-.img-thumbnail {
-    max-width: 100%;
-    height: auto;
-    cursor: pointer;
 }
 
 @media (min-width: 768px) {

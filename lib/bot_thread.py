@@ -241,16 +241,16 @@ class BotThread(threading.Thread):
                 # No element to highlight/unhighlight for wait action
                 # Capture screenshot
                 try:
-                    full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
+                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
                 except Exception as e:
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                    full_screenshot_path = None
+                    full_screenshot_data = None
 
-                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_path, action.get('friendly_description', ''))
+                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''))
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
                 # Store full screenshot path for later use
-                result = {'success': True, 'screenshot': full_screenshot_path}
+                result = {'success': True, 'screenshot': full_screenshot_data}
                 return result
             elif action['action'] == 'get_select_values':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
@@ -259,42 +259,42 @@ class BotThread(threading.Thread):
                 options = [{'text': option.text, 'value': option.get_attribute('value')} for option in select.options]
                 # Capture screenshot
                 try:
-                    full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
+                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
                 except Exception as e:
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                    full_screenshot_path = None
+                    full_screenshot_data = None
 
-                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_path, action.get('friendly_description', ''))
+                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, action.get('friendly_description', ''))
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
-                result = {'success': True, 'screenshot': full_screenshot_path}
+                result = {'success': True, 'screenshot': full_screenshot_data}
                 return result
 
             self.handle_alerts()
 
             # Capture screenshot
             try:
-                full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
+                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                full_screenshot_path = None
+                full_screenshot_data = None
 
             self.unhighlight_element(element)
 
-            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_path, action.get('friendly_description', ''))
+            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             # Store full screenshot path for later use
-            result = {'success': True, 'screenshot': full_screenshot_path}
+            result = {'success': True, 'screenshot': full_screenshot_data}
             return result
 
         except Exception as e:
             error_msg = f"Failed to {action['action']} element {action.get('element', '')}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
-            full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver)
-            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_path, None)
-            return {'success': False, 'screenshot': full_screenshot_path}
+            full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, None, False)
+            return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self, action, result):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -342,7 +342,7 @@ class BotThread(threading.Thread):
 
         if Config.get_log_prompts():
             ticks = int(time.time() * 1000)
-            prompt_filename = f"data/prompt_bot_{self.bot_id}_{ticks}.txt"
+            prompt_filename = f"data/bot_{self.bot_id}_{ticks}_prompt.txt"
             with open(prompt_filename, "w") as f:
                 f.write(prompt)
 
@@ -351,7 +351,7 @@ class BotThread(threading.Thread):
 
         if Config.get_log_prompts():
             ticks = int(time.time() * 1000)
-            response_filename = f"data/response_bot_{self.bot_id}_{ticks}.txt"
+            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
             with open(response_filename, "w") as f:
                 f.write(analysis)
 
@@ -423,7 +423,7 @@ class BotThread(threading.Thread):
 
         if Config.get_log_prompts():
             ticks = int(time.time() * 1000)
-            prompt_filename = f"data/prompt_bot_{self.bot_id}_{ticks}.txt"
+            prompt_filename = f"data/bot_{self.bot_id}_{ticks}_prompt.txt"
             with open(prompt_filename, "w") as f:
                 f.write(prompt)
 
@@ -431,7 +431,7 @@ class BotThread(threading.Thread):
 
         if Config.get_log_prompts():
             ticks = int(time.time() * 1000)
-            response_filename = f"data/response_bot_{self.bot_id}_{ticks}.txt"
+            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
             with open(response_filename, "w") as f:
                 f.write(completion_check)
 

@@ -23,7 +23,7 @@ class Database:
                       step_number INTEGER,
                       action TEXT,
                       element TEXT,
-                      screenshot_path TEXT,
+                      screenshot_data TEXT,
                       friendly_description TEXT,
                       success BOOLEAN DEFAULT TRUE,
                       timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -34,9 +34,9 @@ class Database:
                       bot_id INTEGER,
                       summary TEXT,
                       steps TEXT,
-                      screenshot_path TEXT,
                       screenshot_data BLOB,
                       status TEXT DEFAULT 'new',
+                      reported_at TEXT,
                       resolved_at TEXT,
                       FOREIGN KEY(bot_id) REFERENCES bots(id))''')
 
@@ -86,11 +86,11 @@ class Database:
         conn.commit()
         conn.close()
 
-    def add_step(self, bot_id, step_number, action, element, screenshot_path, friendly_description, success=True):
+    def add_step(self, bot_id, step_number, action, element, screenshot_data, friendly_description, success=True):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_path, friendly_description, success) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                 (bot_id, step_number, action, element, screenshot_path, friendly_description, success))
+        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_data, friendly_description, success) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                 (bot_id, step_number, action, element, screenshot_data, friendly_description, success))
         conn.commit()
         conn.close()
 
@@ -105,8 +105,8 @@ class Database:
     def add_bug(self, bot_id, summary, steps, screenshot_data=None):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_data) VALUES (?, ?, ?, ?)",
-                 (bot_id, summary, steps, screenshot_data))
+        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_data, reported_at) VALUES (?, ?, ?, ?, ?)",
+                 (bot_id, summary, steps, screenshot_data, datetime.now().isoformat()))
         conn.commit()
         bug_id = c.lastrowid
         conn.close()
