@@ -111,21 +111,20 @@ def export_bug(bug_id):
     json_data = {
         'bug_id': bug[0],
         'bot_id': bug[1],
-        'bot_name': bug[9] if len(bug) > 9 else 'Unknown Bot',
+        'bot_name': bug[8] if len(bug) > 8 else 'Unknown Bot',
         'summary': bug[2],
-        'status': bug[6],
-        'reported_at': bug[7],
-        'resolved_at': bug[8] if len(bug) > 8 else None,
+        'status': bug[5],
+        'reported_at': bug[6],
+        'resolved_at': bug[7] if len(bug) > 7 else None,
         'steps': steps,
-        'knowledge': knowledge,
-        'screenshot_data': bug[5]
+        'knowledge': knowledge
     }
 
     # Create text summary
     text_summary = f"Bug #{bug[0]} - {bug[2]}\n"
-    text_summary += f"Bot: {bug[9]}\n"
-    text_summary += f"Status: {bug[6]}\n"
-    text_summary += f"Reported: {bug[7]}\n"
+    text_summary += f"Bot: {bug[8]}\n"
+    text_summary += f"Status: {bug[5]}\n"
+    text_summary += f"Reported: {bug[6]}\n"
     text_summary += "\nSteps:\n"
     for step in steps:
         text_summary += f"- Step {step[2]}: {step[3]}\n"
@@ -147,14 +146,6 @@ def export_bug(bug_id):
 
         # Add text summary
         zip_file.writestr('bug_summary.txt', text_summary)
-
-        # Add screenshot if available
-        if bug[5]:
-            try:
-                with open(bug[5], 'rb') as img_file:
-                    zip_file.writestr('screenshot.png', img_file.read())
-            except Exception as e:
-                logger.error(f"Error adding screenshot to ZIP: {str(e)}")
 
     zip_buffer.seek(0)
     return send_file(
