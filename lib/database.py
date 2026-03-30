@@ -119,6 +119,14 @@ class Database:
         bugs = c.fetchall()
         conn.close()
         return bugs
+    
+    def get_bug_count(self, bot_id):
+        conn = sqlite3.connect('data/bots.db')
+        c = conn.cursor()
+        c.execute("SELECT * FROM bugs WHERE bot_id = ?", (bot_id,))
+        bugs = c.fetchall()
+        conn.close()
+        return len(bugs)
 
     def get_all_bugs(self):
         conn = sqlite3.connect('data/bots.db')

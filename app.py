@@ -47,7 +47,10 @@ logger.info("NEWT application initialized")
 @app.route('/')
 def index():
     bots = db.get_all_bots()
-    return render_template('index.html', bots=bots, db=db)
+    bug_count = 0
+    for bot in bots:
+        bug_count += db.get_bug_count(bot[0])
+    return render_template('index.html', bots=bots, db=db, bug_count=bug_count)
 
 @app.route('/create', methods=['GET', 'POST'])
 def create_bot():
