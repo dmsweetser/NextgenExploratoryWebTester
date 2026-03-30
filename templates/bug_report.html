@@ -115,15 +115,6 @@
         <p>{{ knowledge }}</p>
     </div>
 
-    <div class="section">
-        <h2 class="section-title">Screenshot</h2>
-        {% if bug[4] %}
-        <img src="data:image/png;base64,{{ bug[4] }}" class="screenshot" alt="Bug screenshot" onclick="showFullImage('data:image/png;base64,{{ bug[4] }}')">
-        {% else %}
-        <p>No screenshot available</p>
-        {% endif %}
-    </div>
-
     <div class="screenshot-full" id="screenshotFull" onclick="closeFullImage()">
         <div class="screenshot-full-close" onclick="closeFullImage()">×</div>
         <img src="" id="fullImage" alt="Full screenshot">
