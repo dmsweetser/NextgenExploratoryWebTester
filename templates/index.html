@@ -20,7 +20,7 @@
     {% set all_bugs_count = 0 %}
     {% for bot in bots %}
         {% set bugs = db.get_bugs(bot[0]) %}
-        {% set all_bugs_count = all_bugs_count + bugs|length %}
+        {% set all_bugs_count = all_bugs_count + bugs|count %}
     {% endfor %}
 
     <div class="row mb-3">
