@@ -38,7 +38,7 @@ class BotThread(threading.Thread):
             self.initialize_driver()
             self.llm = self.llm_factory.create_llm()
 
-            known_bugs = self.db.get_known_bugs() + self.known_bug_summaries
+            self.known_bug_summaries = self.db.get_known_bugs() + self.known_bug_summaries
             step_number = len(self.steps_taken) + 1
 
             while not self.stop_event.is_set():
@@ -67,7 +67,7 @@ class BotThread(threading.Thread):
                 context = {
                     'directive': self.directive,
                     'current_page': simplified_html,
-                    'known_bugs': known_bugs,
+                    'known_bugs': self.known_bug_summaries,
                     'steps_taken': self.steps_taken,
                     'current_url': current_url,
                     'previous_bug_summaries': self.known_bug_summaries
@@ -92,7 +92,7 @@ class BotThread(threading.Thread):
                 analysis_result, analysis = self.detect_bug(action, result)
                 if analysis_result:
                     bug_id = self.report_bug(action, result, context, analysis)
-                    known_bugs.append(self.db.get_knowledge_for_bug(bug_id))
+                    self.known_bug_summaries.append(self.db.get_knowledge_for_bug(bug_id))
 
                 # Update simplified HTML
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -149,7 +149,7 @@ class BotThread(threading.Thread):
         Current URL: {context['current_url']}
 
         Previous action status:
-        {'SUCCESS' if context['steps_taken'][-1]['success'] else 'FAILED'}
+        {'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED'}
 
         What should your next action be? Respond ONLY with the following:
 
@@ -239,57 +239,78 @@ class BotThread(threading.Thread):
                 time.sleep(int(action['value']))
                 action_text = f"Waited for {action['value']} seconds"
                 # No element to highlight/unhighlight for wait action
+                # Capture screenshot
+                try:
+                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                except Exception as e:
+                    self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
+                    full_screenshot_data = None
+
+                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''))
+                self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
+
                 # Store full screenshot path for later use
-                result = {'success': True, 'screenshot': None}
+                result = {'success': True, 'screenshot': full_screenshot_data}
                 return result
             elif action['action'] == 'get_select_values':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Got select values from {action['element']}"
                 select = Select(element)
                 options = [{'text': option.text, 'value': option.get_attribute('value')} for option in select.options]
-                self.db.add_step(self.bot_id, step_number, action_text, action['element'], None)
-                result = {'success': True, 'screenshot': None}
+                # Capture screenshot
+                try:
+                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                except Exception as e:
+                    self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
+                    full_screenshot_data = None
+
+                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, action.get('friendly_description', ''))
+                self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
+
+                result = {'success': True, 'screenshot': full_screenshot_data}
                 return result
 
             self.handle_alerts()
 
-            # Capture large screenshot and save both full and thumbnail versions
+            # Capture screenshot
             try:
-                full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_full.png", full_size=True)
-                thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_step_{step_number}_thumb.png", full_size=False)
+                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                full_screenshot_path = None
-                thumbnail_screenshot_path = None
+                full_screenshot_data = None
 
             self.unhighlight_element(element)
 
-            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), thumbnail_screenshot_path, action.get('friendly_description', ''))
+            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             # Store full screenshot path for later use
-            result = {'success': True, 'screenshot': full_screenshot_path}
+            result = {'success': True, 'screenshot': full_screenshot_data}
             return result
 
         except Exception as e:
             error_msg = f"Failed to {action['action']} element {action.get('element', '')}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
-            full_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}_full.png", full_size=True)
-            thumbnail_screenshot_path = self.screenshot_capturer.capture_screenshot(self.driver, f"bot_{self.bot_id}_error_step_{step_number}_thumb.png", full_size=False)
-            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), thumbnail_screenshot_path, None)
-            return {'success': False, 'screenshot': full_screenshot_path}
+            full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, None, False)
+            return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self, action, result):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        steps_context = "\n".join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
+        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
         prompt = f"""
         Analyze the following page content and determine if there's a bug based on the previous action.
+
+        Current directive: {self.directive}
 
         Previous steps taken:
         {steps_context}
 
         Current action: {action['action']} {action.get('element', '')}
+
+        Known bugs to avoid:
+        {chr(10).join(self.known_bug_summaries)}
 
         Page content:
         {simplified_html}
@@ -299,7 +320,7 @@ class BotThread(threading.Thread):
         2. Logical blocking - elements that should be interactive but aren't
         3. Typos or incorrect text that indicates a problem
         4. Unexpected page states or behaviors
-
+        5. Comparison with known bugs to determine if this is a new issue
 
         Respond ONLY with the following:
 
@@ -319,8 +340,21 @@ class BotThread(threading.Thread):
         ```
         """
 
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            prompt_filename = f"data/bot_{self.bot_id}_{ticks}_prompt.txt"
+            with open(prompt_filename, "w") as f:
+                f.write(prompt)
+
         self.logger.debug(f"Bot {self.bot_id} - Bug detection prompt: {prompt[:500]}...")
         analysis = self.llm.get_action(prompt)
+
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
+            with open(response_filename, "w") as f:
+                f.write(analysis)
+
         self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
         analysis_object = {
             "is_bug": extract_line_based_content(analysis, "[newt_isbug_start]", "[newt_isbug_end]"),
@@ -333,8 +367,18 @@ class BotThread(threading.Thread):
     def report_bug(self, action, result, context, analysis):
         summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
-        bug_id = self.db.add_bug(self.bot_id, summary, steps, result['screenshot'])
-        knowledge = analysis["description"] + "\n\n" + analysis["recommendation"]
+
+        # Read screenshot data for embedding
+        screenshot_data = None
+        if result['screenshot']:
+            try:
+                with open(result['screenshot'], 'rb') as img_file:
+                    screenshot_data = img_file.read()
+            except Exception as e:
+                self.logger.error(f"Bot {self.bot_id} - Error reading screenshot: {str(e)}")
+
+        bug_id = self.db.add_bug(self.bot_id, summary, steps, screenshot_data)
+        knowledge = analysis["description"] + chr(10) + analysis["recommendation"]
         self.db.add_knowledge(bug_id, knowledge)
 
         self.bug_reporter.send_notification(summary, knowledge, analysis.get('severity', 'medium'))
@@ -342,12 +386,19 @@ class BotThread(threading.Thread):
 
     def is_directive_complete(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
         prompt = f"""
         Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
         Current directive: {self.directive}
+
+        Previous steps taken:
+        {steps_context}
+
+        Known bugs to avoid:
+        {chr(10).join(self.known_bug_summaries)}
+
         Current page content: {simplified_html}
-        Steps taken so far: {json.dumps([{'step': s['step'], 'action': s['action'], 'element': s.get('element', '')} for s in self.steps_taken])}
 
         Consider:
         1. Has the directive been fully satisfied?
@@ -370,7 +421,20 @@ class BotThread(threading.Thread):
         ```
         """
 
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            prompt_filename = f"data/bot_{self.bot_id}_{ticks}_prompt.txt"
+            with open(prompt_filename, "w") as f:
+                f.write(prompt)
+
         completion_check = self.llm.get_action(prompt)
+
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
+            with open(response_filename, "w") as f:
+                f.write(completion_check)
+
         parsed_completion_check = extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
         return parsed_completion_check == "True"
 

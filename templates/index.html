@@ -17,12 +17,6 @@
         {% endif %}
     {% endfor %}
 
-    {% set all_bugs_count = 0 %}
-    {% for bot in bots %}
-        {% set bugs = db.get_bugs(bot[0]) %}
-        {% set all_bugs_count = all_bugs_count + bugs|length %}
-    {% endfor %}
-
     <div class="row mb-3">
         <div class="col-md-4">
             <div class="card text-white bg-primary mb-3">
@@ -46,7 +40,7 @@
             <div class="card text-white bg-warning mb-3">
                 <div class="card-header">Bugs Found</div>
                 <div class="card-body">
-                    <h5 class="card-title">{{ all_bugs_count }}</h5>
+                    <h5 class="card-title">{{ bug_count }}</h5>
                     <p class="card-text">Total bugs reported</p>
                 </div>
             </div>

@@ -95,3 +95,7 @@ class Config:
     @classmethod
     def get_headless(cls) -> bool:
         return os.getenv('HEADLESS', 'true').lower() == 'true'
+
+    @classmethod
+    def get_log_prompts(cls) -> bool:
+        return os.getenv('LOG_PROMPTS', 'true').lower() == 'true'
