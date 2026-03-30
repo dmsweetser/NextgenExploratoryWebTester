@@ -13,3 +13,4 @@ response.log
 llama.cpp
 uploads
 static/images/*
+data/*
