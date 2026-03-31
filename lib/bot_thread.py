@@ -40,7 +40,7 @@ class BotThread(threading.Thread):
             self.llm = self.llm_factory.create_llm()
 
             # Get known bugs for this specific bot only
-            self.known_bug_summaries = self.db.get_knowledge_for_bot(self.bot_id)
+            self.known_bug_summaries = self.db.get_bugs(self.bot_id)
             step_number = len(self.steps_taken) + 1
 
             while not self.stop_event.is_set():
@@ -98,7 +98,7 @@ class BotThread(threading.Thread):
                 if analysis_result:
                     bug_id = self.report_bug(action, result, context, analysis)
                     # Update known bugs for this bot
-                    self.known_bug_summaries = self.db.get_knowledge_for_bot(self.bot_id)
+                    self.known_bug_summaries = self.db.get_bugs(self.bot_id)
 
                 # Update simplified HTML
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
