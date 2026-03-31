@@ -356,16 +356,7 @@ class BotThread(threading.Thread):
         summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
 
-        # Read screenshot data for embedding
-        screenshot_data = None
-        if result['screenshot']:
-            try:
-                with open(result['screenshot'], 'rb') as img_file:
-                    screenshot_data = img_file.read()
-            except Exception as e:
-                self.logger.error(f"Bot {self.bot_id} - Error reading screenshot: {str(e)}")
-
-        bug_id = self.db.add_bug(self.bot_id, summary, steps, screenshot_data)
+        bug_id = self.db.add_bug(self.bot_id, summary, steps)
         knowledge = analysis["description"] + chr(10) + analysis["recommendation"]
         self.db.add_knowledge(bug_id, knowledge)
 

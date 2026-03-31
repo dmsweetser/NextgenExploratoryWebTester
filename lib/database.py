@@ -34,7 +34,6 @@ class Database:
                       bot_id INTEGER,
                       summary TEXT,
                       steps TEXT,
-                      screenshot_data BLOB,
                       status TEXT DEFAULT 'new',
                       reported_at TEXT,
                       resolved_at TEXT,
@@ -102,11 +101,11 @@ class Database:
         conn.close()
         return steps
 
-    def add_bug(self, bot_id, summary, steps, screenshot_data=None):
+    def add_bug(self, bot_id, summary, steps, status='new'):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_data, reported_at) VALUES (?, ?, ?, ?, ?)",
-                 (bot_id, summary, steps, screenshot_data, datetime.now().isoformat()))
+        c.execute("INSERT INTO bugs (bot_id, summary, steps, status, reported_at) VALUES (?, ?, ?, ?, ?)",
+                 (bot_id, summary, steps, status, datetime.now().isoformat()))
         conn.commit()
         bug_id = c.lastrowid
         conn.close()
@@ -119,14 +118,14 @@ class Database:
         bugs = c.fetchall()
         conn.close()
         return bugs
-    
+
     def get_bug_count(self, bot_id):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("SELECT * FROM bugs WHERE bot_id = ?", (bot_id,))
-        bugs = c.fetchall()
+        c.execute("SELECT COUNT(*) FROM bugs WHERE bot_id = ?", (bot_id,))
+        count = c.fetchone()[0]
         conn.close()
-        return len(bugs)
+        return count
 
     def get_all_bugs(self):
         conn = sqlite3.connect('data/bots.db')
@@ -175,11 +174,3 @@ class Database:
         knowledge = {row[1]: row[2] for row in c.fetchall()}
         conn.close()
         return knowledge
-
-    def get_known_bugs(self):
-        conn = sqlite3.connect('data/bots.db')
-        c = conn.cursor()
-        c.execute("SELECT knowledge_text FROM bug_knowledge")
-        known_bugs = [row[0] for row in c.fetchall()]
-        conn.close()
-        return known_bugs
