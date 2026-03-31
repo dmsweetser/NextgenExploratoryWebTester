@@ -69,10 +69,9 @@ class BotThread(threading.Thread):
                 context = {
                     'directive': self.directive,
                     'current_page': simplified_html,
-                    'known_bugs': self.known_bug_summaries,
+                    'known_bugs': json.dumps(self.known_bug_summaries),
                     'steps_taken': self.steps_taken,
                     'current_url': current_url,
-                    'previous_bug_summaries': self.known_bug_summaries
                 }
 
                 action = self.get_next_action(context)
@@ -142,9 +141,6 @@ class BotThread(threading.Thread):
 
         Known bugs to avoid:
         {chr(10).join(context['known_bugs'])}
-
-        Previous bug summaries:
-        {chr(10).join(context['previous_bug_summaries'])}
 
         Steps taken so far:
         {chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')}" for s in context['steps_taken']])}
@@ -302,7 +298,7 @@ class BotThread(threading.Thread):
         Current action: {action['action']} {action.get('element', '')}
 
         Known bugs to avoid:
-        {chr(10).join(self.known_bug_summaries)}
+        {chr(10).join(json.dumps(self.known_bug_summaries))}
 
         Page content:
         {simplified_html}
@@ -388,7 +384,7 @@ class BotThread(threading.Thread):
         {steps_context}
 
         Known bugs to avoid:
-        {chr(10).join(self.known_bug_summaries)}
+        {chr(10).join(json.dumps(self.known_bug_summaries))}
 
         Current page content: {simplified_html}
 
