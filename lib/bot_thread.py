@@ -298,7 +298,7 @@ class BotThread(threading.Thread):
         Current action: {action['action']} {action.get('element', '')}
 
         Known bugs to avoid:
-        {chr(10).join(json.dumps(self.known_bug_summaries))}
+        {json.dumps(self.known_bug_summaries)}
 
         Page content:
         {simplified_html}
@@ -384,7 +384,7 @@ class BotThread(threading.Thread):
         {steps_context}
 
         Known bugs to avoid:
-        {chr(10).join(json.dumps(self.known_bug_summaries))}
+        {json.dumps(self.known_bug_summaries)}
 
         Current page content: {simplified_html}
 
