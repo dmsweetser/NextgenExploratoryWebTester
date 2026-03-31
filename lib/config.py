@@ -99,3 +99,7 @@ class Config:
     @classmethod
     def get_log_prompts(cls) -> bool:
         return os.getenv('LOG_PROMPTS', 'true').lower() == 'true'
+
+    @classmethod
+    def get_default_wait(cls) -> int:
+        return int(os.getenv('DEFAULT_WAIT', '10'))
