@@ -30,6 +30,7 @@ class BotThread(threading.Thread):
         self.steps_taken = steps_taken or []
         self.known_bug_summaries = known_bug_summaries or []
         self.logger = logger
+        self.default_wait = Config.get_default_wait()
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -38,7 +39,8 @@ class BotThread(threading.Thread):
             self.initialize_driver()
             self.llm = self.llm_factory.create_llm()
 
-            self.known_bug_summaries = self.db.get_known_bugs() + self.known_bug_summaries
+            # Get known bugs for this specific bot only
+            self.known_bug_summaries = self.db.get_knowledge_for_bot(self.bot_id)
             step_number = len(self.steps_taken) + 1
 
             while not self.stop_event.is_set():
@@ -88,11 +90,15 @@ class BotThread(threading.Thread):
                 })
                 step_number += 1
 
+                # Add default wait after every action
+                time.sleep(self.default_wait)
+
                 # Check for bugs
                 analysis_result, analysis = self.detect_bug(action, result)
                 if analysis_result:
                     bug_id = self.report_bug(action, result, context, analysis)
-                    self.known_bug_summaries.append(self.db.get_knowledge_for_bug(bug_id))
+                    # Update known bugs for this bot
+                    self.known_bug_summaries = self.db.get_knowledge_for_bot(self.bot_id)
 
                 # Update simplified HTML
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -122,12 +128,9 @@ class BotThread(threading.Thread):
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--allow-running-insecure-content')
         options.add_argument('--disable-web-security')
-        # Configure to handle unexpected alerts
         options.add_argument('--disable-features=VizDisplayCompositor')
         self.driver = webdriver.Chrome(options=options)
-        # Set window size to capture full page
         self.driver.set_window_size(1920, 1080)
-        # Configure to handle unexpected alerts
         self.driver.implicitly_wait(10)
 
     def get_next_action(self, context):
@@ -205,40 +208,31 @@ class BotThread(threading.Thread):
             if action['action'] == 'click':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Clicked {action['element']}"
-                # Highlight element before action
                 self.highlight_element(element)
                 element.click()
-                # Handle potential alerts after click
                 self.handle_alerts()
             elif action['action'] == 'fill':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Filled {action['element']} with {action['value']}"
-                # Highlight element before action
                 self.highlight_element(element)
                 element.send_keys(action['value'])
-                # Handle potential alerts after fill
                 self.handle_alerts()
             elif action['action'] == 'select':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Selected {action['value']} from {action['element']}"
-                # Highlight element before action
                 self.highlight_element(element)
                 select = Select(element)
                 select.select_by_value(action['value'])
-                # Handle potential alerts after select
                 self.handle_alerts()
             elif action['action'] == 'submit':
                 element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
                 action_text = f"Submitted form via {action['element']}"
-                # Highlight element before action
                 self.highlight_element(element)
                 element.submit()
-                # Handle potential alerts after submit
                 self.handle_alerts()
             elif action['action'] == 'wait':
                 time.sleep(int(action['value']))
                 action_text = f"Waited for {action['value']} seconds"
-                # No element to highlight/unhighlight for wait action
                 # Capture screenshot
                 try:
                     full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
@@ -249,7 +243,6 @@ class BotThread(threading.Thread):
                 self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''))
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
-                # Store full screenshot path for later use
                 result = {'success': True, 'screenshot': full_screenshot_data}
                 return result
             elif action['action'] == 'get_select_values':
@@ -284,7 +277,6 @@ class BotThread(threading.Thread):
             self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
-            # Store full screenshot path for later use
             result = {'success': True, 'screenshot': full_screenshot_data}
             return result
 

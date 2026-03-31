@@ -85,3 +85,14 @@ function closeFullImage() {
         screenshotFull.style.display = 'none';
     }
 }
+
+// Add event listeners to all screenshot thumbs on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const thumbs = document.querySelectorAll('.screenshot-thumb');
+    thumbs.forEach(thumb => {
+        thumb.addEventListener('click', function() {
+            const src = this.getAttribute('src');
+            showFullImage(src);
+        });
+    });
+});

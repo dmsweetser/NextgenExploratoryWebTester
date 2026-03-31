@@ -24,7 +24,7 @@ class LLMFactory:
             return AzureFoundry()
 
 class LocalLlama:
-    
+
     def get_action(self, prompt, bot_id=None):
         model_path = Config.get_model_path()
         if not model_path:
@@ -73,14 +73,13 @@ class LocalLlama:
                 break
             response_content += token
             current_iteration += 1
-            # Add timeout to prevent hanging
-            if current_iteration > 10000:  # 10,000 tokens should be enough
+            if current_iteration > 10000:
                 process.terminate()
                 break
         process.wait()
         return response_content
 
-class AzureFoundry:
+class AzureFoundry():
     def __init__(self):
         self.client = None
         self.initialize_client()
@@ -108,7 +107,6 @@ class AzureFoundry:
         response = self.client.complete(
             stream=True,
             messages=[
-                SystemMessage(content="You are a helpful web testing assistant. Respond with JSON."),
                 UserMessage(content=prompt)
             ],
             max_tokens=Config.get_output_tokens(),
