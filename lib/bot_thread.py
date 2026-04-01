@@ -10,7 +10,7 @@ from lib.config import Config
 from lib.llm_integration import extract_line_based_content
 
 class BotThread(threading.Thread):
-    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None, known_bug_summaries=None):
+    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None):
         threading.Thread.__init__(self)
         self.bot_id = bot_id
         self.start_url = start_url
@@ -25,7 +25,6 @@ class BotThread(threading.Thread):
         self.llm = None
         self.driver = None
         self.steps_taken = steps_taken or []
-        self.known_bug_summaries = known_bug_summaries or []
         self.logger = logger
         self.default_wait = Config.get_default_wait()
 
@@ -36,8 +35,6 @@ class BotThread(threading.Thread):
             self.initialize_driver()
             self.llm = self.llm_factory.create_llm()
 
-            # Get known bugs for this specific bot only
-            self.known_bug_summaries = self.db.get_bugs(self.bot_id, False)
             step_number = len(self.steps_taken) + 1
 
             while not self.stop_event.is_set():
@@ -66,7 +63,7 @@ class BotThread(threading.Thread):
                 context = {
                     'directive': self.directive,
                     'current_page': simplified_html,
-                    'known_bugs': json.dumps(self.known_bug_summaries),
+                    'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
                     'steps_taken': self.steps_taken,
                     'current_url': current_url,
                 }
@@ -81,6 +78,7 @@ class BotThread(threading.Thread):
                     'element': action.get('element', ''),
                     'value': action.get('value', ''),
                     'friendly_description': action.get('friendly_description', ''),
+                    'reasoning': action.get('reasoning', ''),
                     'screenshot': result['screenshot'],
                     'success': result['success']
                 })
@@ -93,8 +91,6 @@ class BotThread(threading.Thread):
                 analysis_result, analysis = self.detect_bug()
                 if analysis_result:
                     self.report_bug(action, result, context, analysis)
-                    # Update known bugs for this bot
-                    self.known_bug_summaries = self.db.get_bugs(self.bot_id, False)
 
                 # Update simplified HTML
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -140,7 +136,7 @@ Known bugs to avoid:
 {chr(10).join(context['known_bugs'])}
 
 Steps taken:
-{chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])}
+{self.get_step_text()}
 
 Current URL: {context['current_url']}
 
@@ -290,17 +286,16 @@ THAT'S AN ORDER, SOLDIER!
 
     def detect_bug(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])
         prompt = f"""
 Analyze the following page content and determine if there's a bug based on the previous action.
 
 Current directive: {self.directive}
 
 Steps taken:
-{steps_context}
+{self.get_step_text()}
 
 Known bugs to avoid:
-{json.dumps(self.known_bug_summaries)}
+{json.dumps(self.db.get_bugs(self.bot_id, False))}
 
 Page content:
 {simplified_html}
@@ -327,7 +322,7 @@ Detailed explanation of why this is a bug
 [newt_recommendation_start]
 How to fix or work around this bug
 [newt_recommendation_end]
-        ```
+```
         """
 
         if Config.get_log_prompts():
@@ -367,17 +362,16 @@ How to fix or work around this bug
 
     def is_directive_complete(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])
         prompt = f"""
 Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
 Current directive: {self.directive}
 
 Steps taken:
-{steps_context}
+{self.get_step_text()}
 
 Known bugs to avoid:
-{json.dumps(self.known_bug_summaries)}
+{json.dumps(self.db.get_bugs(self.bot_id, False))}
 
 Current page content: {simplified_html}
 
@@ -399,7 +393,7 @@ Detailed explanation of why testing should continue or stop
 [newt_nextarea_start]
 If not complete, suggest the next area to test
 [newt_nextarea_end]
-        ```
+```
         """
 
         if Config.get_log_prompts():
@@ -461,3 +455,12 @@ If not complete, suggest the next area to test
             arguments[0].style.border = '';
             arguments[0].style.boxShadow = '';
         """, element)
+
+    def get_step_text(self):
+        return chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" 
+                             + chr(10) 
+                             + "Friendly Description: " 
+                             + s.get('friendly_description', '') 
+                             + chr(10) 
+                             + "Reasoning: " 
+                             + s.get("reasoning", '') for s in self.steps_taken])
