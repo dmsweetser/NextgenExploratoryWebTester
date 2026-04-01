@@ -111,10 +111,14 @@ class Database:
         conn.close()
         return bug_id
 
-    def get_bugs(self, bot_id):
+    def get_bugs(self, bot_id, include_steps=True):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("SELECT * FROM bugs WHERE bot_id = ?", (bot_id,))
+        if include_steps:
+            script = "SELECT summary, steps FROM bugs WHERE bot_id = ? and resolved_at == ''"
+        else:
+            script = "SELECT summary FROM bugs WHERE bot_id = ? and resolved_at == ''"
+        c.execute(script, (bot_id,))
         bugs = c.fetchall()
         conn.close()
         return bugs

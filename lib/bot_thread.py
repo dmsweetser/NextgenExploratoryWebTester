@@ -37,7 +37,7 @@ class BotThread(threading.Thread):
             self.llm = self.llm_factory.create_llm()
 
             # Get known bugs for this specific bot only
-            self.known_bug_summaries = self.db.get_bugs(self.bot_id)
+            self.known_bug_summaries = self.db.get_bugs(self.bot_id, False)
             step_number = len(self.steps_taken) + 1
 
             while not self.stop_event.is_set():
@@ -94,7 +94,7 @@ class BotThread(threading.Thread):
                 if analysis_result:
                     bug_id = self.report_bug(action, result, context, analysis)
                     # Update known bugs for this bot
-                    self.known_bug_summaries = self.db.get_bugs(self.bot_id)
+                    self.known_bug_summaries = self.db.get_bugs(self.bot_id, False)
 
                 # Update simplified HTML
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -145,7 +145,7 @@ class BotThread(threading.Thread):
         Current URL: {context['current_url']}
 
         Previous action status:
-        {'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED'}
+        {'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED' if len(context['steps_taken']) > 0 else 'N/A'}
 
         What should your next action be? Respond ONLY with the following:
 
@@ -176,7 +176,20 @@ class BotThread(threading.Thread):
         THAT'S AN ORDER, SOLDIER!
         """
 
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            prompt_filename = f"data/bot_{self.bot_id}_{ticks}_prompt.txt"
+            with open(prompt_filename, "w") as f:
+                f.write(prompt)
+
         action = self.llm.get_action(prompt)
+
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
+            with open(response_filename, "w") as f:
+                f.write(action)
+
         action_dict = {
             "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
             "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
@@ -184,12 +197,6 @@ class BotThread(threading.Thread):
             "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
             "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
         }
-
-        # If previous action failed and we're not waiting, add a small wait to allow page to stabilize
-        if context['steps_taken'] and not context['steps_taken'][-1]['success'] and action_dict['action'] not in ['wait', 'get_select_values']:
-            action_dict['action'] = 'wait'
-            action_dict['value'] = '2'
-            action_dict['friendly_description'] = 'Wait to allow page to stabilize after previous failure'
 
         return action_dict
 
@@ -289,10 +296,8 @@ class BotThread(threading.Thread):
 
         Current directive: {self.directive}
 
-        Previous steps taken:
+        Steps taken:
         {steps_context}
-
-        Current action: {action['action']} {action.get('element', '')}
 
         Known bugs to avoid:
         {json.dumps(self.known_bug_summaries)}
@@ -368,7 +373,7 @@ class BotThread(threading.Thread):
 
         Current directive: {self.directive}
 
-        Previous steps taken:
+        Steps taken:
         {steps_context}
 
         Known bugs to avoid:
