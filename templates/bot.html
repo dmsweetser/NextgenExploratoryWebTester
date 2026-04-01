@@ -85,8 +85,8 @@
             <div class="timeline-item">
                 <div class="timeline-point"></div>
                 <div class="timeline-content">
-                    <h6 class="timeline-title">{{ step[8] if step[8] else step[3] }}</h6>
-                    <p class="timeline-time">{{ step[6] }}</p>
+                    <h6 class="timeline-title">{{ step[6] if step[6] else step[3] }}</h6>
+                    <p class="timeline-time">{{ step[8] }}</p>
                     {% if step[5] %}
                     <img src="data:image/png;base64,{{ step[5] }}" class="screenshot-thumb"
                         alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step[5] }}')">
@@ -103,7 +103,7 @@
 
 <div class="card mb-4">
     <div class="card-header">
-        <i class="bi bi-bug"></i> NEWT Bugs Found
+        <i class="bi bi-bug"></i> Unresolved NEWT Bugs
     </div>
     <div class="card-body">
         {% if bugs %}
@@ -112,32 +112,24 @@
                 <thead class="table-light">
                     <tr>
                         <th>Summary</th>
-                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for bug in bugs %}
                     <tr>
-                        <td>{{ bug[2] }}</td>
-                        <td>
-                            <span class="badge bg-{% if bug[6] == 'resolved' %}success{% else %}warning{% endif %}">
-                                {{ bug[6] }}
-                            </span>
-                        </td>
+                        <td>{{ bug[1] }}</td>
                         <td>
                             <a href="{{ url_for('export_bug', bug_id=bug[0]) }}"
                                 class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-download"></i> Export NEWT Report
                             </a>
-                            {% if bug[6] != 'resolved' %}
                             <form action="{{ url_for('resolve_bug', bug_id=bug[0]) }}" method="post"
                                 style="display: inline;">
                                 <button type="submit" class="btn btn-sm btn-outline-success">
                                     <i class="bi bi-check-circle"></i> Resolve
                                 </button>
                             </form>
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -145,7 +137,7 @@
             </table>
         </div>
         {% else %}
-        <p class="text-muted">No NEWT bugs found yet.</p>
+        <p class="text-muted">No unresolved NEWT bugs found.</p>
         {% endif %}
     </div>
 </div>
@@ -162,10 +154,11 @@
         </div>
     </div>
 </div>
+{% endif %}
+
 
 <div class="screenshot-full" id="screenshotFull" onclick="closeFullImage()">
     <div class="screenshot-full-close" onclick="closeFullImage()">×</div>
     <img src="" id="fullImage" alt="Full screenshot">
 </div>
-{% endif %}
 {% endblock %}

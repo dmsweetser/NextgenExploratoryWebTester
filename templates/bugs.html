@@ -27,17 +27,17 @@
                         <tr>
                             <td>#{{ bug[0] }}</td>
                             <td>{{ bug[2] }}</td>
-                            <td>{{ bug[8] }}</td>
+                            <td>{{ bug[7] }}</td>
                             <td>
-                                <span class="badge bg-{% if bug[6] == 'resolved' %}success{% else %}warning{% endif %}">
-                                    {{ bug[5] }}
+                                <span class="badge bg-{% if bug[4] == 'resolved' %}success{% else %}warning{% endif %}">
+                                    {{ bug[4] }}
                                 </span>
                             </td>
                             <td>
                                 <a href="{{ url_for('export_bug', bug_id=bug[0]) }}" class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-download"></i> Export NEWT Report
                                 </a>
-                                {% if bug[5] != 'resolved' %}
+                                {% if bug[4] != 'resolved' %}
                                 <form action="{{ url_for('resolve_bug', bug_id=bug[0]) }}" method="post" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-outline-success">
                                         <i class="bi bi-check-circle"></i> Resolve

@@ -25,6 +25,7 @@ class Database:
                       element TEXT,
                       screenshot_data TEXT,
                       friendly_description TEXT,
+                      reasoning TEXT,
                       success BOOLEAN DEFAULT TRUE,
                       timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
                       FOREIGN KEY(bot_id) REFERENCES bots(id))''')
@@ -34,7 +35,6 @@ class Database:
                       bot_id INTEGER,
                       summary TEXT,
                       steps TEXT,
-                      screenshot_data BLOB,
                       status TEXT DEFAULT 'new',
                       reported_at TEXT,
                       resolved_at TEXT,
@@ -86,11 +86,11 @@ class Database:
         conn.commit()
         conn.close()
 
-    def add_step(self, bot_id, step_number, action, element, screenshot_data, friendly_description, success=True):
+    def add_step(self, bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success=True):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_data, friendly_description, success) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                 (bot_id, step_number, action, element, screenshot_data, friendly_description, success))
+        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                 (bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success))
         conn.commit()
         conn.close()
 
@@ -102,31 +102,35 @@ class Database:
         conn.close()
         return steps
 
-    def add_bug(self, bot_id, summary, steps, screenshot_data=None):
+    def add_bug(self, bot_id, summary, steps, status='new'):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO bugs (bot_id, summary, steps, screenshot_data, reported_at) VALUES (?, ?, ?, ?, ?)",
-                 (bot_id, summary, steps, screenshot_data, datetime.now().isoformat()))
+        c.execute("INSERT INTO bugs (bot_id, summary, steps, status, reported_at) VALUES (?, ?, ?, ?, ?)",
+                 (bot_id, summary, steps, status, datetime.now().isoformat()))
         conn.commit()
         bug_id = c.lastrowid
         conn.close()
         return bug_id
 
-    def get_bugs(self, bot_id):
+    def get_bugs(self, bot_id, include_steps=True):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("SELECT * FROM bugs WHERE bot_id = ?", (bot_id,))
+        if include_steps:
+            script = "SELECT id, summary, steps FROM bugs WHERE bot_id = ? and status != 'resolved'"
+        else:
+            script = "SELECT id, summary FROM bugs WHERE bot_id = ? and status != 'resolved'"
+        c.execute(script, (bot_id,))
         bugs = c.fetchall()
         conn.close()
         return bugs
-    
+
     def get_bug_count(self, bot_id):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("SELECT * FROM bugs WHERE bot_id = ?", (bot_id,))
-        bugs = c.fetchall()
+        c.execute("SELECT COUNT(*) FROM bugs WHERE bot_id = ?", (bot_id,))
+        count = c.fetchone()[0]
         conn.close()
-        return len(bugs)
+        return count
 
     def get_all_bugs(self):
         conn = sqlite3.connect('data/bots.db')
@@ -175,11 +179,3 @@ class Database:
         knowledge = {row[1]: row[2] for row in c.fetchall()}
         conn.close()
         return knowledge
-
-    def get_known_bugs(self):
-        conn = sqlite3.connect('data/bots.db')
-        c = conn.cursor()
-        c.execute("SELECT knowledge_text FROM bug_knowledge")
-        known_bugs = [row[0] for row in c.fetchall()]
-        conn.close()
-        return known_bugs
