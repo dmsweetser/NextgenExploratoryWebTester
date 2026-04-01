@@ -63,7 +63,8 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM bots ORDER BY created_at DESC")
-        bots = c.fetchall()
+        columns = [column[0] for column in c.description]
+        bots = [dict(zip(columns, row)) for row in c.fetchall()]
         conn.close()
         return bots
 
@@ -71,7 +72,8 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM bots WHERE id = ?", (bot_id,))
-        bot = c.fetchone()
+        columns = [column[0] for column in c.description]
+        bot = dict(zip(columns, c.fetchone())) if c.fetchone() else None
         conn.close()
         return bot
 
@@ -89,7 +91,7 @@ class Database:
     def add_step(self, bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success=True):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                  (bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success))
         conn.commit()
         conn.close()
@@ -98,7 +100,8 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM steps WHERE bot_id = ? ORDER BY step_number", (bot_id,))
-        steps = c.fetchall()
+        columns = [column[0] for column in c.description]
+        steps = [dict(zip(columns, row)) for row in c.fetchall()]
         conn.close()
         return steps
 
@@ -120,7 +123,8 @@ class Database:
         else:
             script = "SELECT id, summary FROM bugs WHERE bot_id = ? and status != 'resolved'"
         c.execute(script, (bot_id,))
-        bugs = c.fetchall()
+        columns = [column[0] for column in c.description]
+        bugs = [dict(zip(columns, row)) for row in c.fetchall()]
         conn.close()
         return bugs
 
@@ -136,7 +140,8 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT b.*, bt.name as bot_name FROM bugs b JOIN bots bt ON b.bot_id = bt.id ORDER BY b.id DESC")
-        bugs = c.fetchall()
+        columns = [column[0] for column in c.description]
+        bugs = [dict(zip(columns, row)) for row in c.fetchall()]
         conn.close()
         return bugs
 
@@ -144,9 +149,10 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT b.*, bt.name as bot_name FROM bugs b JOIN bots bt ON b.bot_id = bt.id WHERE b.id = ?", (bug_id,))
-        bug = c.fetchone()
+        columns = [column[0] for column in c.description]
+        bug = dict(zip(columns, c.fetchone())) if c.fetchone() else None
         conn.close()
-        return bug if bug else None
+        return bug
 
     def resolve_bug(self, bug_id):
         conn = sqlite3.connect('data/bots.db')
@@ -176,6 +182,7 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("SELECT * FROM bug_knowledge")
-        knowledge = {row[1]: row[2] for row in c.fetchall()}
+        columns = [column[0] for column in c.description]
+        knowledge = {str(row[1]): row[2] for row in c.fetchall()}
         conn.close()
         return knowledge
