@@ -131,49 +131,49 @@ class BotThread(threading.Thread):
 
     def get_next_action(self, context):
         prompt = f"""
-        You are a web testing bot. Your current directive is: {context['directive']}
+You are a web testing bot. Your current directive is: {context['directive']}
 
-        Current page HTML (simplified):
-        {context['current_page']}
+Current page HTML (simplified):
+{context['current_page']}
 
-        Known bugs to avoid:
-        {chr(10).join(context['known_bugs'])}
+Known bugs to avoid:
+{chr(10).join(context['known_bugs'])}
 
-        Steps taken:
-        {chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])}
+Steps taken:
+{chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])}
 
-        Current URL: {context['current_url']}
+Current URL: {context['current_url']}
 
-        Previous action status:
-        {'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED' if len(context['steps_taken']) > 0 else 'N/A'}
+Previous action status:
+{'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED' if len(context['steps_taken']) > 0 else 'N/A'}
 
-        What should your next action be? Respond ONLY with the following:
+What should your next action be? Respond ONLY with the following:
 
-        ```
-        [newt_action_start]
-        The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
-        [newt_action_end]
-        [newt_element_start]
-        The CSS selector for the element to interact with
-        [newt_element_end]
-        [newt_value_start]
-        For fill/select actions, the value to fill (if needed)
-        [newt_value_end]
-        [newt_friendly_description_start]
-        A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
-        [newt_friendly_description_end]
-        [newt_reasoning_start]
-        Brief explanation of your choice, considering any previous failures
-        [newt_reasoning_end]
-        ```        
+```
+[newt_action_start]
+The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
+[newt_action_end]
+[newt_element_start]
+The CSS selector for the element to interact with
+[newt_element_end]
+[newt_value_start]
+For fill/select actions, the value to fill (if needed)
+[newt_value_end]
+[newt_friendly_description_start]
+A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
+[newt_friendly_description_end]
+[newt_reasoning_start]
+Brief explanation of your choice, considering any previous failures
+[newt_reasoning_end]
+```        
 
-        IMPORTANT:
-        1) If the previous action failed, choose a different approach or try a similar action with a different selector
-        2) Avoid repeating actions that have already been attempted
-        3) Consider the previous bugs and steps to determine a new approach
-        4) Use the most specific, unique selector when interacting with an element
+IMPORTANT:
+1) If the previous action failed, choose a different approach or try a similar action with a different selector
+2) Avoid repeating actions that have already been attempted
+3) Consider the previous bugs and steps to determine a new approach
+4) Use the most specific, unique selector when interacting with an element
 
-        THAT'S AN ORDER, SOLDIER!
+THAT'S AN ORDER, SOLDIER!
         """
 
         if Config.get_log_prompts():
@@ -292,41 +292,41 @@ class BotThread(threading.Thread):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])
         prompt = f"""
-        Analyze the following page content and determine if there's a bug based on the previous action.
+Analyze the following page content and determine if there's a bug based on the previous action.
 
-        Current directive: {self.directive}
+Current directive: {self.directive}
 
-        Steps taken:
-        {steps_context}
+Steps taken:
+{steps_context}
 
-        Known bugs to avoid:
-        {json.dumps(self.known_bug_summaries)}
+Known bugs to avoid:
+{json.dumps(self.known_bug_summaries)}
 
-        Page content:
-        {simplified_html}
+Page content:
+{simplified_html}
 
-        Consider:
-        1. Any error messages, exceptions, or malfunctions
-        2. Logical blocking - elements that should be interactive but aren't
-        3. Typos or incorrect text that indicates a problem
-        4. Unexpected page states or behaviors
-        5. Comparison with known bugs to determine if this is a new issue
+Consider:
+1. Any error messages, exceptions, or malfunctions
+2. Logical blocking - elements that should be interactive but aren't
+3. Typos or incorrect text that indicates a problem
+4. Unexpected page states or behaviors
+5. Comparison with known bugs to determine if this is a new issue
 
-        Respond ONLY with the following:
+Respond ONLY with the following:
 
-        ```
-        [newt_isbug_start]
-        True or False
-        [newt_isbug_end]
-        [newt_severity_start]
-        High, Medium or Low
-        [newt_severity_end]
-        [newt_description_start]
-        Detailed explanation of why this is a bug
-        [newt_description_end]
-        [newt_recommendation_start]
-        How to fix or work around this bug
-        [newt_recommendation_end]
+```
+[newt_isbug_start]
+True or False
+[newt_isbug_end]
+[newt_severity_start]
+High, Medium or Low
+[newt_severity_end]
+[newt_description_start]
+Detailed explanation of why this is a bug
+[newt_description_end]
+[newt_recommendation_start]
+How to fix or work around this bug
+[newt_recommendation_end]
         ```
         """
 
@@ -369,36 +369,36 @@ class BotThread(threading.Thread):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])
         prompt = f"""
-        Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
+Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
-        Current directive: {self.directive}
+Current directive: {self.directive}
 
-        Steps taken:
-        {steps_context}
+Steps taken:
+{steps_context}
 
-        Known bugs to avoid:
-        {json.dumps(self.known_bug_summaries)}
+Known bugs to avoid:
+{json.dumps(self.known_bug_summaries)}
 
-        Current page content: {simplified_html}
+Current page content: {simplified_html}
 
-        Consider:
-        1. Has the directive been fully satisfied?
-        2. Are there any remaining interactive elements that need testing?
-        3. Is there any indication that testing should continue?
-        4. Have all major functionality areas been covered?
+Consider:
+1. Has the directive been fully satisfied?
+2. Are there any remaining interactive elements that need testing?
+3. Is there any indication that testing should continue?
+4. Have all major functionality areas been covered?
 
-        Respond ONLY with the following:
+Respond ONLY with the following:
 
-        ```
-        [newt_iscomplete_start]
-        True or False
-        [newt_iscomplete_end]
-        [newt_reasoning_start]
-        Detailed explanation of why testing should continue or stop
-        [newt_reasoning_end]
-        [newt_nextarea_start]
-        If not complete, suggest the next area to test
-        [newt_nextarea_end]
+```
+[newt_iscomplete_start]
+True or False
+[newt_iscomplete_end]
+[newt_reasoning_start]
+Detailed explanation of why testing should continue or stop
+[newt_reasoning_end]
+[newt_nextarea_start]
+If not complete, suggest the next area to test
+[newt_nextarea_end]
         ```
         """
 
