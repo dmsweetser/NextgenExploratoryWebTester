@@ -5,15 +5,12 @@ import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime
 from lib.config import Config
-from lib.llm_integration import LLMFactory, extract_line_based_content
+from lib.llm_integration import extract_line_based_content
 
 class BotThread(threading.Thread):
-    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None, known_bug_summaries=None):
+    def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None):
         threading.Thread.__init__(self)
         self.bot_id = bot_id
         self.start_url = start_url
@@ -27,8 +24,6 @@ class BotThread(threading.Thread):
         self.stop_event = threading.Event()
         self.llm = None
         self.driver = None
-        self.steps_taken = steps_taken or []
-        self.known_bug_summaries = known_bug_summaries or []
         self.logger = logger
         self.default_wait = Config.get_default_wait()
 
@@ -39,9 +34,7 @@ class BotThread(threading.Thread):
             self.initialize_driver()
             self.llm = self.llm_factory.create_llm()
 
-            # Get known bugs for this specific bot only
-            self.known_bug_summaries = self.db.get_bugs(self.bot_id)
-            step_number = len(self.steps_taken) + 1
+            step_number = len(self.db.get_steps(self.bot_id)) + 1
 
             while not self.stop_event.is_set():
                 try:
@@ -69,8 +62,8 @@ class BotThread(threading.Thread):
                 context = {
                     'directive': self.directive,
                     'current_page': simplified_html,
-                    'known_bugs': json.dumps(self.known_bug_summaries),
-                    'steps_taken': self.steps_taken,
+                    'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
+                    'steps_taken': self.db.get_steps(self.bot_id),
                     'current_url': current_url,
                 }
 
@@ -78,26 +71,15 @@ class BotThread(threading.Thread):
 
                 # Execute action
                 result = self.execute_action(action, step_number)
-                self.steps_taken.append({
-                    'step': step_number,
-                    'action': action['action'],
-                    'element': action.get('element', ''),
-                    'value': action.get('value', ''),
-                    'friendly_description': action.get('friendly_description', ''),
-                    'screenshot': result['screenshot'],
-                    'success': result['success']
-                })
                 step_number += 1
 
                 # Add default wait after every action
                 time.sleep(self.default_wait)
 
                 # Check for bugs
-                analysis_result, analysis = self.detect_bug(action, result)
+                analysis_result, analysis = self.detect_bug()
                 if analysis_result:
-                    bug_id = self.report_bug(action, result, context, analysis)
-                    # Update known bugs for this bot
-                    self.known_bug_summaries = self.db.get_bugs(self.bot_id)
+                    self.report_bug(action, result, context, analysis)
 
                 # Update simplified HTML
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -133,53 +115,67 @@ class BotThread(threading.Thread):
         self.driver.implicitly_wait(10)
 
     def get_next_action(self, context):
+        steps_taken = self.db.get_steps(self.bot_id)
         prompt = f"""
-        You are a web testing bot. Your current directive is: {context['directive']}
+You are a web testing bot. Your current directive is: {context['directive']}
 
-        Current page HTML (simplified):
-        {context['current_page']}
+Current page HTML (simplified):
+{context['current_page']}
 
-        Known bugs to avoid:
-        {chr(10).join(context['known_bugs'])}
+Known bugs to avoid:
+{context['known_bugs']}
 
-        Steps taken so far:
-        {chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')}" for s in context['steps_taken']])}
+Steps taken:
+{self.get_step_text()}
 
-        Current URL: {context['current_url']}
+Current URL: {context['current_url']}
 
-        Previous action status:
-        {'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED'}
+Previous action status:
+{'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
 
-        What should your next action be? Respond ONLY with the following:
+What should your next action be? Respond ONLY with the following:
 
-        ```
-        [newt_action_start]
-        The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
-        [newt_action_end]
-        [newt_element_start]
-        The CSS selector for the element to interact with
-        [newt_element_end]
-        [newt_value_start]
-        For fill/select actions, the value to fill (if needed)
-        [newt_value_end]
-        [newt_friendly_description_start]
-        A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
-        [newt_friendly_description_end]
-        [newt_reasoning_start]
-        Brief explanation of your choice, considering any previous failures
-        [newt_reasoning_end]
-        ```        
+```
+[newt_action_start]
+The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
+[newt_action_end]
+[newt_element_start]
+The CSS selector for the element to interact with
+[newt_element_end]
+[newt_value_start]
+For fill/select actions, the value to fill (if needed)
+[newt_value_end]
+[newt_friendly_description_start]
+A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
+[newt_friendly_description_end]
+[newt_reasoning_start]
+Brief explanation of your choice, considering any previous failures
+[newt_reasoning_end]
+```        
 
-        IMPORTANT:
-        1) If the previous action failed, choose a different approach or try a similar action with a different selector
-        2) Avoid repeating actions that have already been attempted
-        3) Consider the previous bugs and steps to determine a new approach
-        4) Use the most specific, unique selector when interacting with an element
+IMPORTANT:
+1) If the previous action failed, choose a different approach or try a similar action with a different selector
+2) Avoid repeating actions that have already been attempted
+3) Consider the previous bugs and steps to determine a new approach
+4) Use the most specific, unique selector when interacting with an element
 
-        THAT'S AN ORDER, SOLDIER!
+THAT'S AN ORDER, SOLDIER!
         """
 
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            prompt_filename = f"data/bot_{self.bot_id}_{ticks}_prompt.txt"
+            with open(prompt_filename, "w") as f:
+                f.write(prompt)
+
         action = self.llm.get_action(prompt)
+
+        if Config.get_log_prompts():
+            ticks = int(time.time() * 1000)
+            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
+            with open(response_filename, "w") as f:
+                f.write(action)
+
         action_dict = {
             "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
             "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
@@ -187,12 +183,6 @@ class BotThread(threading.Thread):
             "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
             "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
         }
-
-        # If previous action failed and we're not waiting, add a small wait to allow page to stabilize
-        if context['steps_taken'] and not context['steps_taken'][-1]['success'] and action_dict['action'] not in ['wait', 'get_select_values']:
-            action_dict['action'] = 'wait'
-            action_dict['value'] = '2'
-            action_dict['friendly_description'] = 'Wait to allow page to stabilize after previous failure'
 
         return action_dict
 
@@ -236,7 +226,7 @@ class BotThread(threading.Thread):
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                     full_screenshot_data = None
 
-                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''))
+                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
                 result = {'success': True, 'screenshot': full_screenshot_data}
@@ -253,7 +243,7 @@ class BotThread(threading.Thread):
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                     full_screenshot_data = None
 
-                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, action.get('friendly_description', ''))
+                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
                 result = {'success': True, 'screenshot': full_screenshot_data}
@@ -270,7 +260,7 @@ class BotThread(threading.Thread):
 
             self.unhighlight_element(element)
 
-            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''))
+            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             result = {'success': True, 'screenshot': full_screenshot_data}
@@ -281,51 +271,48 @@ class BotThread(threading.Thread):
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
             full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
-            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, None, False)
+            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
-    def detect_bug(self, action, result):
+    def detect_bug(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
         prompt = f"""
-        Analyze the following page content and determine if there's a bug based on the previous action.
+Analyze the following page content and determine if there's a bug based on the previous action.
 
-        Current directive: {self.directive}
+Current directive: {self.directive}
 
-        Previous steps taken:
-        {steps_context}
+Steps taken:
+{self.get_step_text()}
 
-        Current action: {action['action']} {action.get('element', '')}
+Known bugs to avoid:
+{json.dumps(self.db.get_bugs(self.bot_id, False))}
 
-        Known bugs to avoid:
-        {json.dumps(self.known_bug_summaries)}
+Page content:
+{simplified_html}
 
-        Page content:
-        {simplified_html}
+Consider:
+1. Any error messages, exceptions, or malfunctions
+2. Logical blocking - elements that should be interactive but aren't
+3. Typos or incorrect text that indicates a problem
+4. Unexpected page states or behaviors
+5. Comparison with known bugs to determine if this is a new issue
 
-        Consider:
-        1. Any error messages, exceptions, or malfunctions
-        2. Logical blocking - elements that should be interactive but aren't
-        3. Typos or incorrect text that indicates a problem
-        4. Unexpected page states or behaviors
-        5. Comparison with known bugs to determine if this is a new issue
+Respond ONLY with the following:
 
-        Respond ONLY with the following:
-
-        ```
-        [newt_isbug_start]
-        True or False
-        [newt_isbug_end]
-        [newt_severity_start]
-        High, Medium or Low
-        [newt_severity_end]
-        [newt_description_start]
-        Detailed explanation of why this is a bug
-        [newt_description_end]
-        [newt_recommendation_start]
-        How to fix or work around this bug
-        [newt_recommendation_end]
-        ```
+```
+[newt_isbug_start]
+True or False
+[newt_isbug_end]
+[newt_severity_start]
+High, Medium or Low
+[newt_severity_end]
+[newt_description_start]
+Detailed explanation of why this is a bug
+[newt_description_end]
+[newt_recommendation_start]
+How to fix or work around this bug
+[newt_recommendation_end]
+```
         """
 
         if Config.get_log_prompts():
@@ -356,16 +343,7 @@ class BotThread(threading.Thread):
         summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
 
-        # Read screenshot data for embedding
-        screenshot_data = None
-        if result['screenshot']:
-            try:
-                with open(result['screenshot'], 'rb') as img_file:
-                    screenshot_data = img_file.read()
-            except Exception as e:
-                self.logger.error(f"Bot {self.bot_id} - Error reading screenshot: {str(e)}")
-
-        bug_id = self.db.add_bug(self.bot_id, summary, steps, screenshot_data)
+        bug_id = self.db.add_bug(self.bot_id, summary, steps)
         knowledge = analysis["description"] + chr(10) + analysis["recommendation"]
         self.db.add_knowledge(bug_id, knowledge)
 
@@ -374,39 +352,38 @@ class BotThread(threading.Thread):
 
     def is_directive_complete(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
         prompt = f"""
-        Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
+Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
-        Current directive: {self.directive}
+Current directive: {self.directive}
 
-        Previous steps taken:
-        {steps_context}
+Steps taken:
+{self.get_step_text()}
 
-        Known bugs to avoid:
-        {json.dumps(self.known_bug_summaries)}
+Known bugs to avoid:
+{json.dumps(self.db.get_bugs(self.bot_id, False))}
 
-        Current page content: {simplified_html}
+Current page content: {simplified_html}
 
-        Consider:
-        1. Has the directive been fully satisfied?
-        2. Are there any remaining interactive elements that need testing?
-        3. Is there any indication that testing should continue?
-        4. Have all major functionality areas been covered?
+Consider:
+1. Has the directive been fully satisfied?
+2. Are there any remaining interactive elements that need testing?
+3. Is there any indication that testing should continue?
+4. Have all major functionality areas been covered?
 
-        Respond ONLY with the following:
+Respond ONLY with the following:
 
-        ```
-        [newt_iscomplete_start]
-        True or False
-        [newt_iscomplete_end]
-        [newt_reasoning_start]
-        Detailed explanation of why testing should continue or stop
-        [newt_reasoning_end]
-        [newt_nextarea_start]
-        If not complete, suggest the next area to test
-        [newt_nextarea_end]
-        ```
+```
+[newt_iscomplete_start]
+True or False
+[newt_iscomplete_end]
+[newt_reasoning_start]
+Detailed explanation of why testing should continue or stop
+[newt_reasoning_end]
+[newt_nextarea_start]
+If not complete, suggest the next area to test
+[newt_nextarea_end]
+```
         """
 
         if Config.get_log_prompts():
@@ -468,3 +445,13 @@ class BotThread(threading.Thread):
             arguments[0].style.border = '';
             arguments[0].style.boxShadow = '';
         """, element)
+
+    def get_step_text(self):
+        steps = self.db.get_steps(self.bot_id)
+        return chr(10).join([f"Step {s[2]}: {s[3]} {s[4]}" 
+                             + chr(10) 
+                             + "Friendly Description: " 
+                             + s[6]
+                             + chr(10) 
+                             + "Reasoning: " 
+                             + s[7] for s in steps])

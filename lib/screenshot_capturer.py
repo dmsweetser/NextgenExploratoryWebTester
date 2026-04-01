@@ -1,5 +1,3 @@
-import base64
-
 class ScreenshotCapturer:
     def __init__(self, upload_folder):
         self.upload_folder = upload_folder

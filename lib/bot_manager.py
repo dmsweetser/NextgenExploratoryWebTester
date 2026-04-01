@@ -1,6 +1,3 @@
-import threading
-import logging
-
 class BotManager:
     def __init__(self):
         self.bots = {}

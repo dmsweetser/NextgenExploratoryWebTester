@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup
 
 class HTMLSimplifier:
     # Elements Selenium can interact with or that provide meaningful context

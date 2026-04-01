@@ -1,11 +1,7 @@
 from datetime import datetime
 import os
-import sqlite3
 import logging
-from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify
-from werkzeug.utils import secure_filename
-import threading
-import time
+from flask import Flask, render_template, request, redirect, url_for, send_file
 import json
 from lib.config import Config
 from lib.bot_thread import BotThread
@@ -114,20 +110,20 @@ def export_bug(bug_id):
     json_data = {
         'bug_id': bug[0],
         'bot_id': bug[1],
-        'bot_name': bug[8] if len(bug) > 8 else 'Unknown Bot',
+        'bot_name': bug[7] if len(bug) > 7 else 'Unknown Bot',
         'summary': bug[2],
-        'status': bug[5],
-        'reported_at': bug[6],
-        'resolved_at': bug[7] if len(bug) > 7 else None,
+        'status': bug[4],
+        'reported_at': bug[5],
+        'resolved_at': bug[6] if len(bug) > 6 else None,
         'steps': steps,
         'knowledge': knowledge
     }
 
     # Create text summary
     text_summary = f"Bug #{bug[0]} - {bug[2]}\n"
-    text_summary += f"Bot: {bug[8]}\n"
-    text_summary += f"Status: {bug[5]}\n"
-    text_summary += f"Reported: {bug[6]}\n"
+    text_summary += f"Bot: {bug[7]}\n"
+    text_summary += f"Status: {bug[4]}\n"
+    text_summary += f"Reported: {bug[5]}\n"
     text_summary += "\nSteps:\n"
     for step in steps:
         text_summary += f"- Step {step[2]}: {step[3]}\n"
