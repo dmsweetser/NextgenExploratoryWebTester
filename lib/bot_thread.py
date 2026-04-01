@@ -448,10 +448,10 @@ If not complete, suggest the next area to test
 
     def get_step_text(self):
         steps = self.db.get_steps(self.bot_id)
-        return chr(10).join([f"Step {s[2]}: {s[3]} {s[4]}" 
+        return chr(10).join([f"Step {s['step_number']}: {s['action']} {s['element']}" 
                              + chr(10) 
                              + "Friendly Description: " 
-                             + s[6]
+                             + s['friendly_description']
                              + chr(10) 
                              + "Reasoning: " 
-                             + s[7] for s in steps])
+                             + s['reasoning'] for s in steps])
