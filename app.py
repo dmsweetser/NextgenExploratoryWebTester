@@ -1,11 +1,7 @@
 from datetime import datetime
 import os
-import sqlite3
 import logging
-from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify
-from werkzeug.utils import secure_filename
-import threading
-import time
+from flask import Flask, render_template, request, redirect, url_for, send_file
 import json
 from lib.config import Config
 from lib.bot_thread import BotThread

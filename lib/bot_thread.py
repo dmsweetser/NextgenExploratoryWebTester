@@ -5,12 +5,9 @@ import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from datetime import datetime
 from lib.config import Config
-from lib.llm_integration import LLMFactory, extract_line_based_content
+from lib.llm_integration import extract_line_based_content
 
 class BotThread(threading.Thread):
     def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None, known_bug_summaries=None):
