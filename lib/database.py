@@ -115,9 +115,9 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         if include_steps:
-            script = "SELECT summary, steps FROM bugs WHERE bot_id = ? and status != 'resolved'"
+            script = "SELECT id, summary, steps FROM bugs WHERE bot_id = ? and status != 'resolved'"
         else:
-            script = "SELECT summary FROM bugs WHERE bot_id = ? and status != 'resolved'"
+            script = "SELECT id, summary FROM bugs WHERE bot_id = ? and status != 'resolved'"
         c.execute(script, (bot_id,))
         bugs = c.fetchall()
         conn.close()
