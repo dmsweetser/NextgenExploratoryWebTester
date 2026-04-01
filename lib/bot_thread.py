@@ -226,7 +226,7 @@ THAT'S AN ORDER, SOLDIER!
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                     full_screenshot_data = None
 
-                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''))
+                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
                 result = {'success': True, 'screenshot': full_screenshot_data}
@@ -243,7 +243,7 @@ THAT'S AN ORDER, SOLDIER!
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                     full_screenshot_data = None
 
-                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, action.get('friendly_description', ''))
+                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
                 result = {'success': True, 'screenshot': full_screenshot_data}
@@ -260,7 +260,7 @@ THAT'S AN ORDER, SOLDIER!
 
             self.unhighlight_element(element)
 
-            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''))
+            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             result = {'success': True, 'screenshot': full_screenshot_data}
@@ -271,7 +271,7 @@ THAT'S AN ORDER, SOLDIER!
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
             full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
-            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, None, False)
+            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
@@ -454,4 +454,4 @@ If not complete, suggest the next area to test
                              + s[6]
                              + chr(10) 
                              + "Reasoning: " 
-                             + s.get("reasoning", '') for s in steps])
+                             + s[7] for s in steps])
