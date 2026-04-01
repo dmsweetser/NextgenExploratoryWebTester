@@ -90,9 +90,9 @@ class BotThread(threading.Thread):
                 time.sleep(self.default_wait)
 
                 # Check for bugs
-                analysis_result, analysis = self.detect_bug(action, result)
+                analysis_result, analysis = self.detect_bug()
                 if analysis_result:
-                    bug_id = self.report_bug(action, result, context, analysis)
+                    self.report_bug(action, result, context, analysis)
                     # Update known bugs for this bot
                     self.known_bug_summaries = self.db.get_bugs(self.bot_id, False)
 
@@ -139,8 +139,8 @@ class BotThread(threading.Thread):
         Known bugs to avoid:
         {chr(10).join(context['known_bugs'])}
 
-        Steps taken so far:
-        {chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')}" for s in context['steps_taken']])}
+        Steps taken:
+        {chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])}
 
         Current URL: {context['current_url']}
 
@@ -288,9 +288,9 @@ class BotThread(threading.Thread):
             self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, None, False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
-    def detect_bug(self, action, result):
+    def detect_bug(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
+        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])
         prompt = f"""
         Analyze the following page content and determine if there's a bug based on the previous action.
 
@@ -367,7 +367,7 @@ class BotThread(threading.Thread):
 
     def is_directive_complete(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
-        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" for s in self.steps_taken])
+        steps_context = chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" + chr(10) + s.get('friendly_description', '') for s in self.steps_taken])
         prompt = f"""
         Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
