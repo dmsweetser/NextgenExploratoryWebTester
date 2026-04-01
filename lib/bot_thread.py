@@ -24,7 +24,6 @@ class BotThread(threading.Thread):
         self.stop_event = threading.Event()
         self.llm = None
         self.driver = None
-        self.steps_taken = steps_taken or []
         self.logger = logger
         self.default_wait = Config.get_default_wait()
 
@@ -35,7 +34,7 @@ class BotThread(threading.Thread):
             self.initialize_driver()
             self.llm = self.llm_factory.create_llm()
 
-            step_number = len(self.steps_taken) + 1
+            step_number = len(self.db.get_steps(self.bot_id)) + 1
 
             while not self.stop_event.is_set():
                 try:
@@ -64,7 +63,7 @@ class BotThread(threading.Thread):
                     'directive': self.directive,
                     'current_page': simplified_html,
                     'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
-                    'steps_taken': self.steps_taken,
+                    'steps_taken': self.db.get_steps(self.bot_id),
                     'current_url': current_url,
                 }
 
@@ -72,16 +71,6 @@ class BotThread(threading.Thread):
 
                 # Execute action
                 result = self.execute_action(action, step_number)
-                self.steps_taken.append({
-                    'step': step_number,
-                    'action': action['action'],
-                    'element': action.get('element', ''),
-                    'value': action.get('value', ''),
-                    'friendly_description': action.get('friendly_description', ''),
-                    'reasoning': action.get('reasoning', ''),
-                    'screenshot': result['screenshot'],
-                    'success': result['success']
-                })
                 step_number += 1
 
                 # Add default wait after every action
@@ -126,6 +115,7 @@ class BotThread(threading.Thread):
         self.driver.implicitly_wait(10)
 
     def get_next_action(self, context):
+        steps_taken = self.db.get_steps(self.bot_id)
         prompt = f"""
 You are a web testing bot. Your current directive is: {context['directive']}
 
@@ -133,7 +123,7 @@ Current page HTML (simplified):
 {context['current_page']}
 
 Known bugs to avoid:
-{chr(10).join(context['known_bugs'])}
+{context['known_bugs']}
 
 Steps taken:
 {self.get_step_text()}
@@ -141,7 +131,7 @@ Steps taken:
 Current URL: {context['current_url']}
 
 Previous action status:
-{'SUCCESS' if len(context['steps_taken']) > 0 and context['steps_taken'][-1]['success'] else 'FAILED' if len(context['steps_taken']) > 0 else 'N/A'}
+{'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
 
 What should your next action be? Respond ONLY with the following:
 
@@ -457,10 +447,11 @@ If not complete, suggest the next area to test
         """, element)
 
     def get_step_text(self):
-        return chr(10).join([f"Step {s['step']}: {s['action']} {s.get('element', '')} {s.get('value', '')}" 
+        steps = self.db.get_steps(self.bot_id)
+        return chr(10).join([f"Step {s[2]}: {s[3]} {s[4]}" 
                              + chr(10) 
                              + "Friendly Description: " 
-                             + s.get('friendly_description', '') 
+                             + s[6]
                              + chr(10) 
                              + "Reasoning: " 
-                             + s.get("reasoning", '') for s in self.steps_taken])
+                             + s.get("reasoning", '') for s in steps])
