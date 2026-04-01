@@ -73,7 +73,11 @@ class Database:
         c = conn.cursor()
         c.execute("SELECT * FROM bots WHERE id = ?", (bot_id,))
         columns = [column[0] for column in c.description]
-        bot = dict(zip(columns, c.fetchone())) if c.fetchone() else None
+        row = c.fetchone()
+        if row:
+            bot = dict(zip(columns, row))
+        else:
+            bot = None
         conn.close()
         return bot
 
@@ -150,7 +154,11 @@ class Database:
         c = conn.cursor()
         c.execute("SELECT b.*, bt.name as bot_name FROM bugs b JOIN bots bt ON b.bot_id = bt.id WHERE b.id = ?", (bug_id,))
         columns = [column[0] for column in c.description]
-        bug = dict(zip(columns, c.fetchone())) if c.fetchone() else None
+        row = c.fetchone()
+        if row:
+            bug = dict(zip(columns, row))
+        else:
+            bug = None
         conn.close()
         return bug
 

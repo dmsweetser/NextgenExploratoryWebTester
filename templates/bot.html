@@ -6,7 +6,7 @@
     <h1 class="h2">{{ bot[1] }}</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group mr-2">
-            <form action="{{ url_for('stop_bot', bot_id=bot[0]) }}" method="post">
+            <form action="{{ url_for('stop_bot', bot_id=bot['id']) }}" method="post">
                 <button type="submit" class="btn btn-danger">
                     <i class="bi bi-stop-circle"></i> Stop Bot
                 </button>
@@ -51,7 +51,7 @@
             <div class="col-md-6">
                 <h5><i class="bi bi-gear"></i> Actions</h5>
                 <div class="btn-group" role="group">
-                    <form action="{{ url_for('stop_bot', bot_id=bot[0]) }}" method="post">
+                    <form action="{{ url_for('stop_bot', bot_id=bot['id']) }}" method="post">
                         <button type="submit" class="btn btn-warning">
                             <i class="bi bi-stop-circle"></i> Stop Bot
                         </button>
@@ -63,7 +63,7 @@
                         </button>
                     </form>
                     {% endif %}
-                    <form action="{{ url_for('remove_bot', bot_id=bot[0]) }}" method="post">
+                    <form action="{{ url_for('remove_bot', bot_id=bot['id']) }}" method="post">
                         <button type="submit" class="btn btn-danger">
                             <i class="bi bi-trash"></i> Remove Bot
                         </button>
