@@ -10,6 +10,7 @@ NEWT (Next-gen Exploratory Web Tester) is an advanced automated web testing syst
 - **Multi-Model Support**: Works with both local LLMs (via llama.cpp) and Azure AI models.
 - **Self-Testing**: Built-in test website to verify NEWT functionality.
 - **Email Notifications**: Automatic bug notifications with severity levels.
+- **Web Interface**: User-friendly dashboard to create, monitor, and manage test bots.
 
 ## Installation
 
@@ -121,6 +122,16 @@ SMTP_FROM=newt@yourdomain.com
 BUG_NOTIFICATION_EMAILS=team1@company.com,team2@company.com
 ```
 
+### Application Settings
+
+Additional settings:
+```
+DEBUG=false
+HEADLESS=true
+LOG_PROMPTS=true
+DEFAULT_WAIT=10
+```
+
 ## Self-Test
 
 NEWT includes a built-in test website to verify functionality:
@@ -128,6 +139,20 @@ NEWT includes a built-in test website to verify functionality:
 2. The NEWT bot will navigate through the test website
 3. It should detect the known bug (error message display)
 4. Results appear in the bot dashboard
+
+## Running Unit Tests
+
+To run the unit tests:
+```bash
+python -m unittest discover tests
+```
+
+Or run specific test files:
+```bash
+python -m unittest tests/test_app.py
+python -m unittest tests/test_database.py
+python -m unittest tests/test_bot_manager.py
+```
 
 ## Technical Details
 
@@ -147,6 +172,28 @@ NEWT uses a sophisticated approach to bug detection:
 - **Logical Blocking**: Interactive elements that should work but don't
 - **Typos**: Incorrect or misspelled text that indicates problems
 - **Unexpected Behaviors**: Actions that don't produce the expected results
+
+## Architecture
+
+### Core Components
+
+- **app.py**: Main Flask application with routes and web interface
+- **lib/database.py**: SQLite database for storing bots, steps, and bugs
+- **lib/bot_thread.py**: Threaded bot that performs testing actions
+- **lib/bot_manager.py**: Manages active bot threads
+- **lib/html_simplifier.py**: Simplifies HTML for LLM processing
+- **lib/llm_integration.py**: Handles communication with LLM models
+- **lib/screenshot_capturer.py**: Captures screenshots during testing
+- **lib/bug_reporter.py**: Sends email notifications for bugs
+- **lib/config.py**: Configuration management from environment variables
+
+### Database Schema
+
+The application uses SQLite with the following tables:
+- **bots**: Stores bot configurations and status
+- **steps**: Records each action taken by a bot
+- **bugs**: Tracks detected bugs with status
+- **bug_knowledge**: Stores detailed knowledge about each bug
 
 ## License
 

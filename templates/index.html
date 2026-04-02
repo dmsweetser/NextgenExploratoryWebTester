@@ -10,9 +10,9 @@
     {% set completed_bots = [] %}
     {% set all_bugs = [] %}
     {% for bot in bots %}
-        {% if bot[4] == 'running' %}
+        {% if bot['status'] == 'running' %}
             {% set active_bots = active_bots.append(bot) %}
-        {% elif bot[4] == 'completed' or bot[4] == 'stopped' %}
+        {% elif bot['status'] == 'completed' or bot['status'] == 'stopped' %}
             {% set completed_bots = completed_bots.append(bot) %}
         {% endif %}
     {% endfor %}
@@ -66,11 +66,11 @@
                         <tbody>
                             {% for bot in active_bots %}
                             <tr>
-                                <td>{{ bot[1] }}</td>
-                                <td><a href="{{ bot[2] }}" target="_blank" class="text-decoration-none">{{ bot[2] }}</a></td>
-                                <td>{{ bot[5] }}</td>
+                                <td>{{ bot['name'] }}</td>
+                                <td><a href="{{ bot['start_url'] }}" target="_blank" class="text-decoration-none">{{ bot['start_url'] }}</a></td>
+                                <td>{{ bot['last_activity'] }}</td>
                                 <td>
-                                    <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
+                                    <a href="{{ url_for('bot', bot_id=bot['id']) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye"></i> View NEWT Results
                                     </a>
                                 </td>
@@ -104,16 +104,16 @@
                     <tbody>
                         {% for bot in bots %}
                         <tr>
-                            <td>{{ bot[1] }}</td>
-                            <td><a href="{{ bot[2] }}" target="_blank" class="text-decoration-none">{{ bot[2] }}</a></td>
+                            <td>{{ bot['name'] }}</td>
+                            <td><a href="{{ bot['start_url'] }}" target="_blank" class="text-decoration-none">{{ bot['start_url'] }}</a></td>
                             <td>
-                                <span class="badge bg-{% if bot[4] == 'running' %}primary{% elif bot[4] == 'completed' %}success{% elif bot[4] == 'stopped' %}warning{% elif bot[4] == 'removed' %}secondary{% else %}info{% endif %}">
-                                    {{ bot[4] }}
+                                <span class="badge bg-{% if bot['status'] == 'running' %}primary{% elif bot['status'] == 'completed' %}success{% elif bot['status'] == 'stopped' %}warning{% elif bot['status'] == 'removed' %}secondary{% else %}info{% endif %}">
+                                    {{ bot['status'] }}
                                 </span>
                             </td>
-                            <td>{{ bot[5] }}</td>
+                            <td>{{ bot['last_activity'] }}</td>
                             <td>
-                                <a href="{{ url_for('bot', bot_id=bot[0]) }}" class="btn btn-sm btn-outline-primary">
+                                <a href="{{ url_for('bot', bot_id=bot['id']) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye"></i> View NEWT Results
                                 </a>
                             </td>

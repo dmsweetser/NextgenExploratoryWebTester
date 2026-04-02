@@ -87,11 +87,11 @@
 
     <div class="bug-details">
         <h2 class="section-title">NEWT Bug Summary</h2>
-        <p><strong>Summary:</strong> {{ bug[2] }}</p>
-        <p><strong>NEWT Bot:</strong> {{ bug[8] }}</p>
-        <p><strong>Status:</strong> {{ bug[5] }}</p>
-        <p><strong>Reported:</strong> {{ bug[6] }}</p>
-        {% if bug[8] %}<p><strong>Resolved:</strong> {{ bug[7] }}</p>{% endif %}
+        <p><strong>Summary:</strong> {{ bug['summary'] }}</p>
+        <p><strong>NEWT Bot:</strong> {{ bug.get('bot_name', 'Unknown Bot') }}</p>
+        <p><strong>Status:</strong> {{ bug['status'] }}</p>
+        <p><strong>Reported:</strong> {{ bug['reported_at'] }}</p>
+        {% if bug.get('resolved_at') %}<p><strong>Resolved:</strong> {{ bug['resolved_at'] }}</p>{% endif %}
     </div>
 
     <div class="section">
@@ -99,11 +99,11 @@
         <ol class="steps-list">
             {% for step in steps %}
             <li>
-                <strong>{{ step[8] if step[8] and step[8] != '' else step[3] }}</strong>
-                {% if step[4] %}<br><small>Element: {{ step[4] }}</small>{% endif %}
-                {% if step[5] %}
+                <strong>{{ step['timestamp'] if step['timestamp'] and step['timestamp'] != '' else step['action'] }}</strong>
+                {% if step['element'] %}<br><small>Element: {{ step['element'] }}</small>{% endif %}
+                {% if step['screenshot_data'] %}
                 <br>
-                <img src="data:image/png;base64,{{ step[5] }}" class="screenshot" alt="Step screenshot" onclick="showFullImage('data:image/png;base64,{{ step[5] }}')">
+                <img src="data:image/png;base64,{{ step['screenshot_data'] }}" class="screenshot" alt="Step screenshot" onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')">
                 {% endif %}
             </li>
             {% endfor %}
