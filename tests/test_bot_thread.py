@@ -130,9 +130,9 @@ Testing the button
 
     def test_detect_bug(self):
         self.mock_llm.get_action.return_value = """
-[newt_isbug_start]
+[newt_isnewbug_start]
 True
-[newt_isbug_end]
+[newt_isnewbug_end]
 [newt_severity_start]
 High
 [newt_severity_end]

@@ -78,7 +78,7 @@ class BotThread(threading.Thread):
 
                 # Check for bugs
                 analysis_result, analysis = self.detect_bug()
-                if analysis_result:
+                if analysis_result is True:
                     self.report_bug(action, result, context, analysis)
 
                 # Update simplified HTML
@@ -137,7 +137,7 @@ What should your next action be? Respond ONLY with the following:
 
 ```
 [newt_action_start]
-The type of action (e.g., "click", "fill", "select", "submit", "wait", "get_select_values")
+The type of action (e.g., "click", "fill", "select", "submit", "wait" (in seconds), "get_select_values")
 [newt_action_end]
 [newt_element_start]
 The CSS selector for the element to interact with
@@ -277,14 +277,14 @@ THAT'S AN ORDER, SOLDIER!
     def detect_bug(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
         prompt = f"""
-Analyze the following page content and determine if there's a bug based on the previous action.
+Analyze the following page content and determine if there's a new bug based on the previous action.
 
 Current directive: {self.directive}
 
 Steps taken:
 {self.get_step_text()}
 
-Known bugs to avoid:
+Known bugs:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
 Page content:
@@ -295,14 +295,17 @@ Consider:
 2. Logical blocking - elements that should be interactive but aren't
 3. Typos or incorrect text that indicates a problem
 4. Unexpected page states or behaviors
-5. Comparison with known bugs to determine if this is a new issue
+
+Avoid:
+1. Reporting a bug that is the same as an existing known bug
+2. Reporting a bug that is due to an error in the test app (such as a bad selector), and not in the target application
 
 Respond ONLY with the following:
 
 ```
-[newt_isbug_start]
+[newt_isnewbug_start]
 True or False
-[newt_isbug_end]
+[newt_isnewbug_end]
 [newt_severity_start]
 High, Medium or Low
 [newt_severity_end]
@@ -332,7 +335,7 @@ How to fix or work around this bug
 
         self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
         analysis_object = {
-            "is_bug": extract_line_based_content(analysis, "[newt_isbug_start]", "[newt_isbug_end]"),
+            "is_bug": extract_line_based_content(analysis, "[newt_isnewbug_start]", "[newt_isnewbug_end]"),
             "severity": extract_line_based_content(analysis, "[newt_severity_start]", "[newt_severity_end]"),
             "description": extract_line_based_content(analysis, "[newt_description_start]", "[newt_description_end]"),
             "recommendation": extract_line_based_content(analysis, "[newt_recommendation_start]", "[newt_recommendation_end]"),

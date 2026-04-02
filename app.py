@@ -67,8 +67,7 @@ def create_bot():
             screenshot_capturer=screenshot_capturer,
             llm_factory=LLMFactory(),
             logger=logger,
-            steps_taken=[],
-            known_bug_summaries=[]
+            steps_taken=[]
         )
         bot_thread.start()
         bot_manager.add_bot(bot_thread)
@@ -177,8 +176,7 @@ def restart_bot(bot_id):
         screenshot_capturer=screenshot_capturer,
         llm_factory=LLMFactory(),
         logger=logger,
-        steps_taken=[],
-        known_bug_summaries=[]
+        steps_taken=[]
     )
     bot_thread.start()
     bot_manager.add_bot(bot_thread)
