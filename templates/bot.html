@@ -6,7 +6,7 @@
     <h1 class="h2">{{ bot[1] }}</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group mr-2">
-            <form action="{{ url_for('stop_bot', bot_id=bot[0]) }}" method="post">
+            <form action="{{ url_for('stop_bot', bot_id=bot['id']) }}" method="post">
                 <button type="submit" class="btn btn-danger">
                     <i class="bi bi-stop-circle"></i> Stop Bot
                 </button>
@@ -25,45 +25,45 @@
                         <th width="30%">Status:</th>
                         <td>
                             <span
-                                class="badge bg-{% if bot[4] == 'running' %}primary{% elif bot[4] == 'completed' %}success{% elif bot[4] == 'stopped' %}warning{% else %}secondary{% endif %}">
-                                {{ bot[4] }}
+                                class="badge bg-{% if bot['status'] == 'running' %}primary{% elif bot['status'] == 'completed' %}success{% elif bot['status'] == 'stopped' %}warning{% else %}secondary{% endif %}">
+                                {{ bot['status'] }}
                             </span>
                         </td>
                     </tr>
                     <tr>
                         <th>Start URL:</th>
-                        <td><a href="{{ bot[2] }}" target="_blank">{{ bot[2] }}</a></td>
+                        <td><a href="{{ bot['start_url'] }}" target="_blank">{{ bot['start_url'] }}</a></td>
                     </tr>
                     <tr>
                         <th>Directive:</th>
-                        <td>{{ bot[3] }}</td>
+                        <td>{{ bot['directive'] }}</td>
                     </tr>
                     <tr>
                         <th>Last Activity:</th>
-                        <td>{{ bot[5] }}</td>
+                        <td>{{ bot['last_activity'] }}</td>
                     </tr>
                     <tr>
                         <th>Created:</th>
-                        <td>{{ bot[6] }}</td>
+                        <td>{{ bot['created_at'] }}</td>
                     </tr>
                 </table>
             </div>
             <div class="col-md-6">
                 <h5><i class="bi bi-gear"></i> Actions</h5>
                 <div class="btn-group" role="group">
-                    <form action="{{ url_for('stop_bot', bot_id=bot[0]) }}" method="post">
+                    <form action="{{ url_for('stop_bot', bot_id=bot['id']) }}" method="post">
                         <button type="submit" class="btn btn-warning">
                             <i class="bi bi-stop-circle"></i> Stop Bot
                         </button>
                     </form>
-                    {% if bot[4] == 'stopped' %}
-                    <form action="{{ url_for('restart_bot', bot_id=bot[0]) }}" method="post">
+                    {% if bot['status'] == 'stopped' %}
+                    <form action="{{ url_for('restart_bot', bot_id=bot['id']) }}" method="post">
                         <button type="submit" class="btn btn-success">
                             <i class="bi bi-play-circle"></i> Restart Bot
                         </button>
                     </form>
                     {% endif %}
-                    <form action="{{ url_for('remove_bot', bot_id=bot[0]) }}" method="post">
+                    <form action="{{ url_for('remove_bot', bot_id=bot['id']) }}" method="post">
                         <button type="submit" class="btn btn-danger">
                             <i class="bi bi-trash"></i> Remove Bot
                         </button>
@@ -85,11 +85,11 @@
             <div class="timeline-item">
                 <div class="timeline-point"></div>
                 <div class="timeline-content">
-                    <h6 class="timeline-title">{{ step[6] if step[6] else step[3] }}</h6>
-                    <p class="timeline-time">{{ step[8] }}</p>
-                    {% if step[5] %}
-                    <img src="data:image/png;base64,{{ step[5] }}" class="screenshot-thumb"
-                        alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step[5] }}')">
+                    <h6 class="timeline-title">{{ step['friendly_description'] if step['friendly_description'] else step['action'] }}</h6>
+                    <p class="timeline-time">{{ step['timestamp'] }}</p>
+                    {% if step['screenshot_data'] %}
+                    <img src="data:image/png;base64,{{ step['screenshot_data'] }}" class="screenshot-thumb"
+                        alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')">
                     {% endif %}
                 </div>
             </div>
@@ -118,13 +118,13 @@
                 <tbody>
                     {% for bug in bugs %}
                     <tr>
-                        <td>{{ bug[1] }}</td>
+                        <td>{{ bug['summary'] }}</td>
                         <td>
-                            <a href="{{ url_for('export_bug', bug_id=bug[0]) }}"
+                            <a href="{{ url_for('export_bug', bug_id=bug['id']) }}"
                                 class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-download"></i> Export NEWT Report
                             </a>
-                            <form action="{{ url_for('resolve_bug', bug_id=bug[0]) }}" method="post"
+                            <form action="{{ url_for('resolve_bug', bug_id=bug['id']) }}" method="post"
                                 style="display: inline;">
                                 <button type="submit" class="btn btn-sm btn-outline-success">
                                     <i class="bi bi-check-circle"></i> Resolve
@@ -142,7 +142,7 @@
     </div>
 </div>
 
-{% if bot[4] == 'completed' %}
+{% if bot['status'] == 'completed' %}
 <div class="card">
     <div class="card-header">
         <i class="bi bi-check-circle"></i> NEWT Test Conclusion

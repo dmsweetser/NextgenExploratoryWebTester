@@ -45,7 +45,7 @@ def index():
     bots = db.get_all_bots()
     bug_count = 0
     for bot in bots:
-        bug_count += db.get_bug_count(bot[0])
+        bug_count += db.get_bug_count(bot['id'])
     return render_template('index.html', bots=bots, db=db, bug_count=bug_count)
 
 @app.route('/create', methods=['GET', 'POST'])
@@ -67,8 +67,7 @@ def create_bot():
             screenshot_capturer=screenshot_capturer,
             llm_factory=LLMFactory(),
             logger=logger,
-            steps_taken=[],
-            known_bug_summaries=[]
+            steps_taken=[]
         )
         bot_thread.start()
         bot_manager.add_bot(bot_thread)
@@ -100,7 +99,7 @@ def export_bug(bug_id):
     bug = db.get_bug_with_bot_name(bug_id)
     if not bug:
         return redirect(url_for('bugs'))
-    steps = db.get_steps(bug[1])
+    steps = db.get_steps(bug['bot_id'])
     knowledge = db.get_knowledge_for_bug(bug_id)
 
     # Create HTML with embedded images
@@ -108,25 +107,25 @@ def export_bug(bug_id):
 
     # Create JSON data
     json_data = {
-        'bug_id': bug[0],
-        'bot_id': bug[1],
-        'bot_name': bug[7] if len(bug) > 7 else 'Unknown Bot',
-        'summary': bug[2],
-        'status': bug[4],
-        'reported_at': bug[5],
-        'resolved_at': bug[6] if len(bug) > 6 else None,
+        'bug_id': bug['id'],
+        'bot_id': bug['bot_id'],
+        'bot_name': bug.get('bot_name', 'Unknown Bot'),
+        'summary': bug['summary'],
+        'status': bug['status'],
+        'reported_at': bug['reported_at'],
+        'resolved_at': bug.get('resolved_at'),
         'steps': steps,
         'knowledge': knowledge
     }
 
     # Create text summary
-    text_summary = f"Bug #{bug[0]} - {bug[2]}\n"
-    text_summary += f"Bot: {bug[7]}\n"
-    text_summary += f"Status: {bug[4]}\n"
-    text_summary += f"Reported: {bug[5]}\n"
+    text_summary = f"Bug #{bug['id']} - {bug['summary']}\n"
+    text_summary += f"Bot: {bug.get('bot_name', 'Unknown Bot')}\n"
+    text_summary += f"Status: {bug['status']}\n"
+    text_summary += f"Reported: {bug['reported_at']}\n"
     text_summary += "\nSteps:\n"
     for step in steps:
-        text_summary += f"- Step {step[2]}: {step[3]}\n"
+        text_summary += f"- Step {step['step_number']}: {step['action']}\n"
     text_summary += "\nKnowledge:\n"
     text_summary += knowledge
 
@@ -167,9 +166,9 @@ def restart_bot(bot_id):
         return redirect(url_for('index'))
 
     bot_thread = BotThread(
-        bot_id=bot[0],
-        start_url=bot[2],
-        directive=bot[3],
+        bot_id=bot['id'],
+        start_url=bot['start_url'],
+        directive=bot['directive'],
         db=db,
         bot_manager=bot_manager,
         bug_reporter=bug_reporter,
@@ -177,8 +176,7 @@ def restart_bot(bot_id):
         screenshot_capturer=screenshot_capturer,
         llm_factory=LLMFactory(),
         logger=logger,
-        steps_taken=[],
-        known_bug_summaries=[]
+        steps_taken=[]
     )
     bot_thread.start()
     bot_manager.add_bot(bot_thread)
