@@ -137,14 +137,11 @@ What should your next action be? Respond ONLY with the following:
 
 ```
 [newt_action_start]
-The type of action (e.g., "click", "fill", "select", "submit", "wait" (in seconds), "get_select_values")
+A single line, self-contained Javascript command that performs a specific testing action on the page. The command should:
+1. Use standard DOM APIs (querySelector, addEventListener, etc.)
+2. Not use jQuery or other libraries
+3. Be an IIFE that immediately executes
 [newt_action_end]
-[newt_element_start]
-The CSS selector for the element to interact with
-[newt_element_end]
-[newt_value_start]
-For fill/select actions, the value to fill (if needed)
-[newt_value_end]
 [newt_friendly_description_start]
 A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
 [newt_friendly_description_end]
@@ -157,7 +154,7 @@ IMPORTANT:
 1) If the previous action failed, choose a different approach or try a similar action with a different selector
 2) Avoid repeating actions that have already been attempted
 3) Consider the previous bugs and steps to determine a new approach
-4) Use the most specific, unique selector when interacting with an element
+4) The JavaScript must be self-contained and not rely on external libraries
 
 THAT'S AN ORDER, SOLDIER!
         """
@@ -177,9 +174,7 @@ THAT'S AN ORDER, SOLDIER!
                 f.write(action)
 
         action_dict = {
-            "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
-            "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
-            "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
+            "javascript": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
             "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
             "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
         }
@@ -187,69 +182,18 @@ THAT'S AN ORDER, SOLDIER!
         return action_dict
 
     def execute_action(self, action, step_number):
-        element = None
-        action_text = ""
-
         try:
-            if action['action'] == 'click':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                action_text = f"Clicked {action['element']}"
-                self.highlight_element(element)
-                element.click()
-                self.handle_alerts()
-            elif action['action'] == 'fill':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                action_text = f"Filled {action['element']} with {action['value']}"
-                self.highlight_element(element)
-                element.send_keys(action['value'])
-                self.handle_alerts()
-            elif action['action'] == 'select':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                action_text = f"Selected {action['value']} from {action['element']}"
-                self.highlight_element(element)
-                select = Select(element)
-                select.select_by_value(action['value'])
-                self.handle_alerts()
-            elif action['action'] == 'submit':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                action_text = f"Submitted form via {action['element']}"
-                self.highlight_element(element)
-                element.submit()
-                self.handle_alerts()
-            elif action['action'] == 'wait':
-                time.sleep(int(action['value']))
-                action_text = f"Waited for {action['value']} seconds"
-                # Capture screenshot
-                try:
-                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
-                except Exception as e:
-                    self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                    full_screenshot_data = None
+            # Execute the JavaScript function directly in the browser context
+            js_function = action['javascript']
+            js_code = f"""
+                function executeNEWTAction() {{
+                    {js_function}
+                }}
+                return executeNEWTAction();
+            """
 
-                self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
-                self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
-
-                result = {'success': True, 'screenshot': full_screenshot_data}
-                return result
-            elif action['action'] == 'get_select_values':
-                element = self.driver.find_element(By.CSS_SELECTOR, action['element'])
-                action_text = f"Got select values from {action['element']}"
-                select = Select(element)
-                options = [{'text': option.text, 'value': option.get_attribute('value')} for option in select.options]
-                # Capture screenshot
-                try:
-                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
-                except Exception as e:
-                    self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                    full_screenshot_data = None
-
-                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
-                self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
-
-                result = {'success': True, 'screenshot': full_screenshot_data}
-                return result
-
-            self.handle_alerts()
+            result = self.driver.execute_script(js_code)
+            action_text = f"Executed JavaScript action: {js_function}"
 
             # Capture screenshot
             try:
@@ -258,20 +202,18 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                 full_screenshot_data = None
 
-            self.unhighlight_element(element)
-
-            self.db.add_step(self.bot_id, step_number, action_text, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
+            self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             result = {'success': True, 'screenshot': full_screenshot_data}
             return result
 
         except Exception as e:
-            error_msg = f"Failed to {action['action']} element {action.get('element', '')}: {str(e)}"
+            error_msg = f"Failed to execute JavaScript action: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
             full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
-            self.db.add_step(self.bot_id, step_number, error_msg, action.get('element', ''), full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
+            self.db.add_step(self.bot_id, step_number, error_msg, None, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
@@ -451,10 +393,10 @@ If not complete, suggest the next area to test
 
     def get_step_text(self):
         steps = self.db.get_steps(self.bot_id)
-        return chr(10).join([f"Step {s['step_number']}: {s['action']} {s['element']}" 
-                             + chr(10) 
-                             + "Friendly Description: " 
+        return chr(10).join([f"Step {s['step_number']}: {s['action']}"
+                             + chr(10)
+                             + "Friendly Description: "
                              + s['friendly_description']
-                             + chr(10) 
-                             + "Reasoning: " 
+                             + chr(10)
+                             + "Reasoning: "
                              + s['reasoning'] for s in steps])
