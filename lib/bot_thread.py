@@ -5,6 +5,8 @@ import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from lib.config import Config
 from lib.llm_integration import extract_line_based_content
@@ -30,6 +32,7 @@ class BotThread(threading.Thread):
         self.failure_count = 0
         self.max_failures = 3
         self.curious_mode = True
+        self.select_options_cache = {}
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -73,6 +76,7 @@ class BotThread(threading.Thread):
                     'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
                     'steps_taken': self.db.get_steps(self.bot_id),
                     'current_url': current_url,
+                    'select_options_cache': self.select_options_cache
                 }
 
                 action = self.get_next_action(context)
@@ -83,9 +87,6 @@ class BotThread(threading.Thread):
                 # Execute action
                 result = self.execute_action(action, step_number)
                 step_number += 1
-
-                # Add default wait after every action
-                time.sleep(self.default_wait)
 
                 # Check for bugs
                 try:
@@ -135,6 +136,30 @@ class BotThread(threading.Thread):
 
     def get_next_action(self, context):
         steps_taken = self.db.get_steps(self.bot_id)
+        available_selectors = """
+Available Selenium selectors:
+1. CSS_SELECTOR: Select elements by CSS selector
+2. ID: Select element by ID attribute
+3. NAME: Select element by name attribute
+4. XPATH: Select element by XPath expression
+5. CLASS_NAME: Select element by class name
+6. TAG_NAME: Select element by HTML tag name
+7. LINK_TEXT: Select link by exact text
+8. PARTIAL_LINK_TEXT: Select link by partial text
+
+Available actions:
+1. CLICK: Click on an element
+2. SEND_KEYS: Send text to an input element
+3. SELECT_BY_VALUE: Select option in dropdown by value
+4. SELECT_BY_TEXT: Select option in dropdown by text
+5. GET_SELECT_OPTIONS: Get all options for a select element
+6. CLEAR: Clear an input field
+7. SUBMIT: Submit a form
+8. WAIT: Wait for a specific element to be present
+
+For GET_SELECT_OPTIONS, specify the element selector and it will return all available options.
+        """
+
         prompt = f"""
 You are a web testing bot. Your current directive is: {context['directive']}
 
@@ -152,15 +177,20 @@ Current URL: {context['current_url']}
 Previous action status:
 {'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
 
+{available_selectors}
+
 What should your next action be? Respond ONLY with the following:
 
 ```
 [newt_action_start]
-A single line, self-contained Javascript command that performs a specific testing action on the page. The command should:
-1. Use standard DOM APIs (querySelector, addEventListener, etc.)
-2. Not use jQuery or other libraries
-3. Be an IIFE that immediately executes
+ACTION_TYPE
 [newt_action_end]
+[newt_element_start]
+ELEMENT_SELECTOR
+[newt_element_end]
+[newt_value_start]
+VALUE_TO_SEND (if applicable, otherwise leave empty)
+[newt_value_end]
 [newt_friendly_description_start]
 A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
 [newt_friendly_description_end]
@@ -173,9 +203,12 @@ IMPORTANT:
 1) If the previous action failed, choose a different approach or try a similar action with a different selector
 2) Avoid repeating actions that have already been attempted
 3) Consider the previous bugs and steps to determine a new approach
-4) The JavaScript must be self-contained and not rely on external libraries
-5) Be curious! Try edge cases, unusual inputs, and attempt to break things within the bounds of your directive
-6) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
+4) Use the appropriate Selenium action type for what you want to do
+5) For input fields, use SEND_KEYS with the value you want to send
+6) For dropdowns, use SELECT_BY_VALUE or SELECT_BY_TEXT
+7) For GET_SELECT_OPTIONS, only provide the element selector and it will return the available options
+8) Be curious! Try edge cases, unusual inputs, and attempt to break things within the bounds of your directive
+9) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
 
 THAT'S AN ORDER, SOLDIER!
         """
@@ -196,7 +229,9 @@ THAT'S AN ORDER, SOLDIER!
                     f.write(action)
 
             action_dict = {
-                "javascript": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+                "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+                "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
+                "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
                 "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
                 "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
             }
@@ -209,6 +244,28 @@ THAT'S AN ORDER, SOLDIER!
     def get_exploratory_action(self, context):
         """Get an exploratory action when the normal approach fails"""
         steps_taken = self.db.get_steps(self.bot_id)
+        available_selectors = """
+Available Selenium selectors:
+1. CSS_SELECTOR: Select elements by CSS selector
+2. ID: Select element by ID attribute
+3. NAME: Select element by name attribute
+4. XPATH: Select element by XPath expression
+5. CLASS_NAME: Select element by class name
+6. TAG_NAME: Select element by HTML tag name
+7. LINK_TEXT: Select link by exact text
+8. PARTIAL_LINK_TEXT: Select link by partial text
+
+Available actions:
+1. CLICK: Click on an element
+2. SEND_KEYS: Send text to an input element
+3. SELECT_BY_VALUE: Select option in dropdown by value
+4. SELECT_BY_TEXT: Select option in dropdown by text
+5. GET_SELECT_OPTIONS: Get all options for a select element
+6. CLEAR: Clear an input field
+7. SUBMIT: Submit a form
+8. WAIT: Wait for a specific element to be present
+        """
+
         prompt = f"""
 You are a web testing bot in EXPLORATORY MODE. Your current directive is: {context['directive']}
 
@@ -223,13 +280,21 @@ Current URL: {context['current_url']}
 Previous action status:
 {'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
 
+{available_selectors}
+
 Try something UNUSUAL, EDGE CASE, or POTENTIALLY BREAKING within the bounds of your directive.
 Respond ONLY with the following:
 
 ```
 [newt_action_start]
-A single line, self-contained Javascript command that tries something unusual
+ACTION_TYPE
 [newt_action_end]
+[newt_element_start]
+ELEMENT_SELECTOR
+[newt_element_end]
+[newt_value_start]
+VALUE_TO_SEND (if applicable, otherwise leave empty)
+[newt_value_end]
 [newt_friendly_description_start]
 A user-friendly description of what this action will do
 [newt_friendly_description_end]
@@ -242,7 +307,9 @@ Explanation of why this is an exploratory/edge case action
         try:
             action = self.llm.get_action(prompt)
             action_dict = {
-                "javascript": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+                "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+                "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
+                "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
                 "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
                 "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
             }
@@ -253,37 +320,92 @@ Explanation of why this is an exploratory/edge case action
 
     def execute_action(self, action, step_number):
         try:
-            # Execute the JavaScript function directly in the browser context
-            js_function = action['javascript']
-            js_code = f"""
-                function executeNEWTAction() {{
-                    {js_function}
-                }}
-                return executeNEWTAction();
-            """
+            action_type = action['action']
+            element_selector = action['element']
+            value = action.get('value', '')
 
-            result = self.driver.execute_script(js_code)
-            action_text = f"Executed JavaScript action: {js_function}"
+            # Determine the Selenium selector type
+            selector_type = By.ID if element_selector.startswith('#') else By.CSS_SELECTOR
+            if element_selector.startswith('#'):
+                selector_value = element_selector[1:]
+            else:
+                selector_value = element_selector
 
-            # Capture screenshot
+            action_text = f"{action_type} on {element_selector}"
+
+            # Capture screenshot before action
             try:
                 full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                 full_screenshot_data = None
 
-            self.db.add_step(self.bot_id, step_number, action_text, None, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
+            # Execute the action using Selenium
+            if action_type == 'CLICK':
+                element = WebDriverWait(self.driver, self.default_wait).until(
+                    EC.element_to_be_clickable((selector_type, selector_value))
+                )
+                element.click()
+            elif action_type == 'SEND_KEYS':
+                element = WebDriverWait(self.driver, self.default_wait).until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                )
+                element.clear()
+                element.send_keys(value)
+            elif action_type == 'SELECT_BY_VALUE':
+                select = Select(WebDriverWait(self.driver, self.default_wait).until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                ))
+                select.select_by_value(value)
+            elif action_type == 'SELECT_BY_TEXT':
+                select = Select(WebDriverWait(self.driver, self.default_wait).until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                ))
+                select.select_by_visible_text(value)
+            elif action_type == 'GET_SELECT_OPTIONS':
+                select = Select(WebDriverWait(self.driver, self.default_wait).until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                ))
+                options = [opt.text for opt in select.options]
+                self.select_options_cache[element_selector] = options
+                action_text = f"Got select options for {element_selector}: {', '.join(options)}"
+            elif action_type == 'CLEAR':
+                element = WebDriverWait(self.driver, self.default_wait).until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                )
+                element.clear()
+            elif action_type == 'SUBMIT':
+                element = WebDriverWait(self.driver, self.default_wait).until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                )
+                element.submit()
+            elif action_type == 'WAIT':
+                WebDriverWait(self.driver, self.default_wait).until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                )
+
+            # Wait for page to settle after action
+            time.sleep(self.default_wait)
+
+            # Capture screenshot after action
+            try:
+                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+            except Exception as e:
+                self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
+                full_screenshot_data = None
+
+            self.db.add_step(self.bot_id, step_number, action_text, element_selector, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             result = {'success': True, 'screenshot': full_screenshot_data}
             return result
 
         except Exception as e:
-            error_msg = f"Failed to execute JavaScript action: {str(e)}"
+            error_msg = f"Failed to execute action {action_type} on {action['element']}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
             full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
-            self.db.add_step(self.bot_id, step_number, error_msg, None, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
+            self.db.add_step(self.bot_id, step_number, error_msg, action['element'], full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
@@ -478,6 +600,9 @@ If not complete, suggest the next area to test
     def get_step_text(self):
         steps = self.db.get_steps(self.bot_id)
         return chr(10).join([f"Step {s['step_number']}: {s['action']}"
+                             + chr(10)
+                             + "Element: "
+                             + s['element']
                              + chr(10)
                              + "Friendly Description: "
                              + s['friendly_description']
