@@ -32,6 +32,19 @@ class LocalLlama:
         llama_binary = os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "llama-completion")
 
         if not os.path.isfile(llama_binary):
+            # Try alternative binary locations
+            alternative_paths = [
+                os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "llama-cli"),
+                os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "main"),
+                os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "llama"),
+            ]
+
+            for alt_path in alternative_paths:
+                if os.path.isfile(alt_path):
+                    llama_binary = alt_path
+                    break
+
+        if not os.path.isfile(llama_binary):
             raise FileNotFoundError(f"llama binary not found at: {llama_binary}")
 
         ticks = int(time.time() * 1000)
@@ -63,18 +76,35 @@ class LocalLlama:
 
         response_content = ""
         current_iteration = 0
+        process_error = None
 
         while True:
-            token = process.stdout.read(1)
-            if not token:
-                os.remove(filename)
+            try:
+                token = process.stdout.read(1)
+                if not token:
+                    break
+                response_content += token
+                current_iteration += 1
+                if current_iteration > 10000:
+                    process.terminate()
+                    break
+            except Exception as e:
+                process_error = e
+                self.logger.error(f"Error reading from process: {str(e)}")
                 break
-            response_content += token
-            current_iteration += 1
-            if current_iteration > 10000:
-                process.terminate()
-                break
+
         process.wait()
+
+        # Clean up the prompt file
+        try:
+            if os.path.exists(filename):
+                os.remove(filename)
+        except Exception as e:
+            self.logger.error(f"Error removing prompt file: {str(e)}")
+
+        if process_error:
+            raise RuntimeError(f"Error in LLM process: {str(process_error)}")
+
         return response_content
 
 class AzureFoundry():
@@ -102,23 +132,26 @@ class AzureFoundry():
     def get_action(self, prompt, bot_id=None):
         from azure.ai.inference.models import SystemMessage, UserMessage
 
-        response = self.client.complete(
-            stream=True,
-            messages=[
-                UserMessage(content=prompt)
-            ],
-            max_tokens=Config.get_output_tokens(),
-            model=Config.get_model_name()
-        )
+        try:
+            response = self.client.complete(
+                stream=True,
+                messages=[
+                    UserMessage(content=prompt)
+                ],
+                max_tokens=Config.get_output_tokens(),
+                model=Config.get_model_name()
+            )
 
-        response_content = ""
-        for update in response:
-            if update.choices and isinstance(update.choices, list) and len(update.choices) > 0:
-                content = update.choices[0].get("delta", {}).get("content", "")
-                if content is not None:
-                    response_content += content
-            else:
-                break
+            response_content = ""
+            for update in response:
+                if update.choices and isinstance(update.choices, list) and len(update.choices) > 0:
+                    content = update.choices[0].get("delta", {}).get("content", "")
+                    if content is not None:
+                        response_content += content
+                else:
+                    break
 
-        response.close()
-        return response_content
+            response.close()
+            return response_content
+        except Exception as e:
+            raise RuntimeError(f"Error in Azure LLM request: {str(e)}")

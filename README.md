@@ -159,11 +159,19 @@ python -m unittest tests/test_bot_manager.py
 ### How NEWT Works
 
 1. **Initialization**: The NEWT bot loads the specified page and analyzes its structure.
-2. **Action Decision**: The LLM examines the page and decides what action to take next (click, fill, select, etc.).
+2. **Action Decision**: The LLM examines the page and decides what action to take next (click, fill, select, etc.). The bot is programmed to be curious and try edge cases within the bounds of its directive.
 3. **Execution**: The bot performs the action and captures a screenshot.
-4. **Bug Detection**: The LLM analyzes the result to determine if a bug exists.
-5. **Completion Check**: The LLM evaluates whether the testing directive has been satisfied.
+4. **Bug Detection**: The LLM analyzes the result to determine if a bug exists, looking for malfunctions, logical blocking, typos, unexpected behaviors, and edge case failures.
+5. **Completion Check**: The LLM evaluates whether the testing directive has been satisfied and if all edge cases have been explored.
 6. **Reporting**: Bugs are recorded with detailed analysis and screenshots.
+7. **Error Handling**: The bot is resilient to failures and can continue testing even if parts of the process fail.
+
+NEWT is designed to be an exploratory tester, meaning it goes beyond just following a script. It tries to:
+- Test edge cases and unusual scenarios
+- Attempt to break the system within the bounds of its directive
+- Explore multiple paths and approaches
+- Try invalid inputs and unusual combinations
+- Poke and prod the application to find hidden issues
 
 ### Bug Detection Logic
 
@@ -172,6 +180,10 @@ NEWT uses a sophisticated approach to bug detection:
 - **Logical Blocking**: Interactive elements that should work but don't
 - **Typos**: Incorrect or misspelled text that indicates problems
 - **Unexpected Behaviors**: Actions that don't produce the expected results
+- **Edge Cases**: Issues that occur with unusual inputs or combinations
+- **Cross-Path Issues**: Problems that arise when following non-standard user paths
+
+The bot is specifically designed to be curious and exploratory, trying edge cases and unusual scenarios to uncover hidden bugs that might not be found with standard testing approaches.
 
 ## Architecture
 

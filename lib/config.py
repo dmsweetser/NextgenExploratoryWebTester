@@ -103,3 +103,7 @@ class Config:
     @classmethod
     def get_default_wait(cls) -> int:
         return int(os.getenv('DEFAULT_WAIT', '10'))
+
+    @classmethod
+    def get_max_failures(cls) -> int:
+        return int(os.getenv('MAX_FAILURES', '3'))
