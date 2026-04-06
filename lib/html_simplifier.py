@@ -1,50 +1,110 @@
 from bs4 import BeautifulSoup
 
+
 class HTMLSimplifier:
-    # Elements Selenium can interact with or that provide meaningful context
+    # Elements the bot may interact with
     INTERACTIVE_TAGS = {
         "input", "select", "option", "textarea", "button", "a"
     }
 
-    # Elements that provide semantic structure or text context
+    # Semantic and structural context
     CONTEXT_TAGS = {
         "label", "form", "fieldset", "legend",
         "p", "span", "div",
         "ul", "ol", "li",
         "table", "thead", "tbody", "tr", "td", "th",
-        "h1", "h2", "h3", "h4", "h5", "h6"
+        "h1", "h2", "h3", "h4", "h5", "h6",
+        "section", "article", "header", "footer", "nav", "main"
     }
 
     WHITELIST_TAGS = INTERACTIVE_TAGS | CONTEXT_TAGS
 
-    # Attributes Selenium may rely on
+    # Attributes needed for JS selectors or meaning
     WHITELIST_ATTRS = {
-        "type", "value", "checked", "selected", "name",
-        "href", "placeholder", "for", "id"
+        "id", "name", "type", "value",
+        "checked", "selected", "href",
+        "placeholder", "for",
+        "role", "title",
+        "aria-label", "aria-labelledby", "aria-describedby"
     }
 
-    def simplify_html(self, html):
+    def simplify_html(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
 
-        # Remove obvious noise
-        for tag in soup(["script", "style", "noscript", "meta", "link", "svg", "canvas", "img", "iframe", "object", "embed"]):
+        # ---------------------------------------------------------
+        # 1. Remove obvious noise
+        # ---------------------------------------------------------
+        for tag in soup([
+            "script", "style", "noscript", "meta", "link",
+            "svg", "canvas", "img", "iframe", "object", "embed"
+        ]):
             tag.decompose()
 
-        # Remove all non-whitelisted tags but keep their text
+        # ---------------------------------------------------------
+        # 2. Preserve inner text for interactive elements
+        #    BEFORE destructive operations
+        # ---------------------------------------------------------
+        self._preserve_interactive_inner_text(soup)
+
+        # ---------------------------------------------------------
+        # 3. Remove non-whitelisted tags but keep their text
+        # ---------------------------------------------------------
         for tag in soup.find_all(True):
             if tag.name not in self.WHITELIST_TAGS:
                 tag.unwrap()
 
-        # Strip attributes aggressively
+        # ---------------------------------------------------------
+        # 4. Strip attributes aggressively
+        # ---------------------------------------------------------
         for tag in soup.find_all(True):
             attrs = dict(tag.attrs)
             for attr in list(attrs.keys()):
-                if not any(attr == allowed or attr.startswith("data-") for allowed in self.WHITELIST_ATTRS):
+                if attr not in self.WHITELIST_ATTRS:
+                    # Keep class ONLY for interactive elements
+                    if attr == "class" and tag.name in self.INTERACTIVE_TAGS:
+                        continue
                     del tag.attrs[attr]
 
-        # Normalize input elements
+        # ---------------------------------------------------------
+        # 5. Normalize input elements
+        # ---------------------------------------------------------
+        self._normalize_inputs(soup)
+
+        # ---------------------------------------------------------
+        # 6. Normalize selects (keep only selected option)
+        # ---------------------------------------------------------
+        self._normalize_selects(soup)
+
+        # ---------------------------------------------------------
+        # 7. Remove empty containers
+        # ---------------------------------------------------------
+        self._remove_empty_containers(soup)
+
+        # ---------------------------------------------------------
+        # 8. Collapse whitespace
+        # ---------------------------------------------------------
+        simplified = " ".join(str(soup).split())
+
+        return simplified
+
+    # ============================================================
+    # Helpers
+    # ============================================================
+
+    def _preserve_interactive_inner_text(self, soup):
+        """
+        Extracts inner text from interactive elements and injects it
+        as plain text before simplification removes nested tags.
+        """
+        for tag in soup.find_all(True):
+            if tag.name in self.INTERACTIVE_TAGS:
+                text = tag.get_text(" ", strip=True)
+                if text:
+                    tag.insert(0, text + " ")
+
+    def _normalize_inputs(self, soup):
         for input_tag in soup.find_all("input"):
-            t = input_tag.get("type", "text")
+            t = (input_tag.get("type") or "text").lower()
 
             if t == "text":
                 input_tag["value"] = input_tag.get("value", "")
@@ -53,39 +113,43 @@ class HTMLSimplifier:
                     input_tag["checked"] = "checked"
                 else:
                     input_tag.attrs.pop("checked", None)
-            elif t in ("submit", "button"):
-                pass  # keep
+            elif t in ("submit", "button", "reset"):
+                pass
             else:
-                # Remove irrelevant input types (file, hidden, color, date, etc.)
+                # Remove irrelevant input types
                 input_tag.decompose()
 
-        # Normalize select elements
+    def _normalize_selects(self, soup):
         for select_tag in soup.find_all("select"):
             options = select_tag.find_all("option")
-            selected = None
+            if not options:
+                continue
 
-            for option in options:
-                if option.has_attr("selected"):
-                    selected = option
-                    break
-
-            if not selected and options:
+            selected = next((o for o in options if o.has_attr("selected")), None)
+            if not selected:
                 selected = options[0]
 
-            # Remove all other options
+            # Keep only the selected option
             for option in options:
                 if option is not selected:
                     option.decompose()
 
-            select_tag["data-has-options"] = "true"
+            selected["selected"] = "selected"
 
-        # Remove empty containers
-        for tag in soup.find_all(True):
-            if tag.name not in self.INTERACTIVE_TAGS:
-                if not tag.text.strip() and not tag.find(True):
+    def _remove_empty_containers(self, soup):
+        """
+        Remove non-interactive tags that have no text and no children.
+        """
+        changed = True
+        while changed:
+            changed = False
+            for tag in list(soup.find_all(True)):
+                if tag.name in self.INTERACTIVE_TAGS:
+                    continue
+
+                has_text = bool(tag.get_text(strip=True))
+                has_children = bool(tag.find(True))
+
+                if not has_text and not has_children:
                     tag.decompose()
-
-        # Collapse whitespace
-        simplified = " ".join(str(soup).split())
-
-        return simplified
+                    changed = True
