@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.querySelector('.timeline').innerHTML = newContent;
                 })
                 .catch(error => console.error('Error refreshing content:', error));
-        }, 5000);
+        }, 60000);
     }
 });
 

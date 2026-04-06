@@ -55,6 +55,15 @@ def create_bot():
         start_url = request.form['start_url']
         directive = request.form['directive']
 
+        # Validate start URL
+        try:
+            from urllib.parse import urlparse
+            result = urlparse(start_url)
+            if not all([result.scheme, result.netloc]):
+                return render_template('create.html', error="Please enter a valid URL with http:// or https://")
+        except:
+            return render_template('create.html', error="Please enter a valid URL")
+
         bot_id = db.create_bot(name, start_url, directive)
         bot_thread = BotThread(
             bot_id=bot_id,

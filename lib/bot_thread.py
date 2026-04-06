@@ -26,6 +26,10 @@ class BotThread(threading.Thread):
         self.driver = None
         self.logger = logger
         self.default_wait = Config.get_default_wait()
+        self.max_failures = Config.get_max_failures()
+        self.failure_count = 0
+        self.max_failures = 3
+        self.curious_mode = True
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -48,7 +52,11 @@ class BotThread(threading.Thread):
                     time.sleep(2)
                 except Exception as e:
                     self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
-                    break
+                    self.failure_count += 1
+                    if self.failure_count >= self.max_failures:
+                        break
+                    time.sleep(5)
+                    continue
 
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
                 current_url = self.driver.current_url
@@ -68,6 +76,9 @@ class BotThread(threading.Thread):
                 }
 
                 action = self.get_next_action(context)
+                if not action:
+                    self.logger.warning(f"Bot {self.bot_id} - Failed to get next action, trying exploratory approach")
+                    action = self.get_exploratory_action(context)
 
                 # Execute action
                 result = self.execute_action(action, step_number)
@@ -77,16 +88,24 @@ class BotThread(threading.Thread):
                 time.sleep(self.default_wait)
 
                 # Check for bugs
-                analysis_result, analysis = self.detect_bug()
-                if analysis_result is True:
-                    self.report_bug(action, result, context, analysis)
+                try:
+                    analysis_result, analysis = self.detect_bug()
+                    if analysis_result is True:
+                        self.report_bug(action, result, context, analysis)
+                except Exception as e:
+                    self.logger.error(f"Bot {self.bot_id} - Error in bug detection: {str(e)}")
+                    self.failure_count += 1
 
                 # Update simplified HTML
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
 
                 # Check if directive is complete
-                if self.is_directive_complete():
-                    break
+                try:
+                    if self.is_directive_complete():
+                        break
+                except Exception as e:
+                    self.logger.error(f"Bot {self.bot_id} - Error in completion check: {str(e)}")
+                    self.failure_count += 1
 
         except Exception as e:
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
@@ -155,6 +174,8 @@ IMPORTANT:
 2) Avoid repeating actions that have already been attempted
 3) Consider the previous bugs and steps to determine a new approach
 4) The JavaScript must be self-contained and not rely on external libraries
+5) Be curious! Try edge cases, unusual inputs, and attempt to break things within the bounds of your directive
+6) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
 
 THAT'S AN ORDER, SOLDIER!
         """
@@ -165,21 +186,70 @@ THAT'S AN ORDER, SOLDIER!
             with open(prompt_filename, "w") as f:
                 f.write(prompt)
 
-        action = self.llm.get_action(prompt)
+        try:
+            action = self.llm.get_action(prompt)
 
-        if Config.get_log_prompts():
-            ticks = int(time.time() * 1000)
-            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
-            with open(response_filename, "w") as f:
-                f.write(action)
+            if Config.get_log_prompts():
+                ticks = int(time.time() * 1000)
+                response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
+                with open(response_filename, "w") as f:
+                    f.write(action)
 
-        action_dict = {
-            "javascript": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
-            "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
-            "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
-        }
+            action_dict = {
+                "javascript": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+                "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
+                "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
+            }
 
-        return action_dict
+            return action_dict
+        except Exception as e:
+            self.logger.error(f"Bot {self.bot_id} - Error getting next action: {str(e)}")
+            return None
+
+    def get_exploratory_action(self, context):
+        """Get an exploratory action when the normal approach fails"""
+        steps_taken = self.db.get_steps(self.bot_id)
+        prompt = f"""
+You are a web testing bot in EXPLORATORY MODE. Your current directive is: {context['directive']}
+
+Current page HTML (simplified):
+{context['current_page']}
+
+Steps taken:
+{self.get_step_text()}
+
+Current URL: {context['current_url']}
+
+Previous action status:
+{'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
+
+Try something UNUSUAL, EDGE CASE, or POTENTIALLY BREAKING within the bounds of your directive.
+Respond ONLY with the following:
+
+```
+[newt_action_start]
+A single line, self-contained Javascript command that tries something unusual
+[newt_action_end]
+[newt_friendly_description_start]
+A user-friendly description of what this action will do
+[newt_friendly_description_end]
+[newt_reasoning_start]
+Explanation of why this is an exploratory/edge case action
+[newt_reasoning_end]
+```
+        """
+
+        try:
+            action = self.llm.get_action(prompt)
+            action_dict = {
+                "javascript": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
+                "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
+                "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
+            }
+            return action_dict
+        except Exception as e:
+            self.logger.error(f"Bot {self.bot_id} - Error getting exploratory action: {str(e)}")
+            return None
 
     def execute_action(self, action, step_number):
         try:
@@ -237,6 +307,7 @@ Consider:
 2. Logical blocking - elements that should be interactive but aren't
 3. Typos or incorrect text that indicates a problem
 4. Unexpected page states or behaviors
+5. Edge cases or unusual conditions that might indicate a bug
 
 Avoid:
 1. Reporting a bug that is the same as an existing known bug
@@ -266,34 +337,42 @@ How to fix or work around this bug
             with open(prompt_filename, "w") as f:
                 f.write(prompt)
 
-        self.logger.debug(f"Bot {self.bot_id} - Bug detection prompt: {prompt[:500]}...")
-        analysis = self.llm.get_action(prompt)
+        try:
+            self.logger.debug(f"Bot {self.bot_id} - Bug detection prompt: {prompt[:500]}...")
+            analysis = self.llm.get_action(prompt)
 
-        if Config.get_log_prompts():
-            ticks = int(time.time() * 1000)
-            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
-            with open(response_filename, "w") as f:
-                f.write(analysis)
+            if Config.get_log_prompts():
+                ticks = int(time.time() * 1000)
+                response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
+                with open(response_filename, "w") as f:
+                    f.write(analysis)
 
-        self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
-        analysis_object = {
-            "is_bug": extract_line_based_content(analysis, "[newt_isnewbug_start]", "[newt_isnewbug_end]"),
-            "severity": extract_line_based_content(analysis, "[newt_severity_start]", "[newt_severity_end]"),
-            "description": extract_line_based_content(analysis, "[newt_description_start]", "[newt_description_end]"),
-            "recommendation": extract_line_based_content(analysis, "[newt_recommendation_start]", "[newt_recommendation_end]"),
-        }
-        return analysis_object.get('is_bug', False), analysis_object
+            self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
+            analysis_object = {
+                "is_bug": extract_line_based_content(analysis, "[newt_isnewbug_start]", "[newt_isnewbug_end]"),
+                "severity": extract_line_based_content(analysis, "[newt_severity_start]", "[newt_severity_end]"),
+                "description": extract_line_based_content(analysis, "[newt_description_start]", "[newt_description_end]"),
+                "recommendation": extract_line_based_content(analysis, "[newt_recommendation_start]", "[newt_recommendation_end]"),
+            }
+            return analysis_object.get('is_bug', False), analysis_object
+        except Exception as e:
+            self.logger.error(f"Bot {self.bot_id} - Error in bug detection: {str(e)}")
+            return False, {}
 
     def report_bug(self, action, result, context, analysis):
         summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
 
-        bug_id = self.db.add_bug(self.bot_id, summary, steps)
-        knowledge = analysis["description"] + chr(10) + analysis["recommendation"]
-        self.db.add_knowledge(bug_id, knowledge)
+        try:
+            bug_id = self.db.add_bug(self.bot_id, summary, steps)
+            knowledge = analysis["description"] + chr(10) + analysis["recommendation"]
+            self.db.add_knowledge(bug_id, knowledge)
 
-        self.bug_reporter.send_notification(summary, knowledge, analysis.get('severity', 'medium'))
-        return bug_id
+            self.bug_reporter.send_notification(summary, knowledge, analysis.get('severity', 'medium'))
+            return bug_id
+        except Exception as e:
+            self.logger.error(f"Bot {self.bot_id} - Error reporting bug: {str(e)}")
+            return None
 
     def is_directive_complete(self):
         simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
@@ -315,6 +394,7 @@ Consider:
 2. Are there any remaining interactive elements that need testing?
 3. Is there any indication that testing should continue?
 4. Have all major functionality areas been covered?
+5. Have you tried edge cases and unusual scenarios?
 
 Respond ONLY with the following:
 
@@ -337,16 +417,20 @@ If not complete, suggest the next area to test
             with open(prompt_filename, "w") as f:
                 f.write(prompt)
 
-        completion_check = self.llm.get_action(prompt)
+        try:
+            completion_check = self.llm.get_action(prompt)
 
-        if Config.get_log_prompts():
-            ticks = int(time.time() * 1000)
-            response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
-            with open(response_filename, "w") as f:
-                f.write(completion_check)
+            if Config.get_log_prompts():
+                ticks = int(time.time() * 1000)
+                response_filename = f"data/bot_{self.bot_id}_{ticks}_response.txt"
+                with open(response_filename, "w") as f:
+                    f.write(completion_check)
 
-        parsed_completion_check = extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
-        return parsed_completion_check == "True"
+            parsed_completion_check = extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
+            return parsed_completion_check == "True"
+        except Exception as e:
+            self.logger.error(f"Bot {self.bot_id} - Error in completion check: {str(e)}")
+            return False
 
     def is_same_domain(self, url1, url2):
         from urllib.parse import urlparse
