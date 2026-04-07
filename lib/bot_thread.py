@@ -80,9 +80,6 @@ class BotThread(threading.Thread):
                 }
 
                 action = self.get_next_action(context)
-                if not action:
-                    self.logger.warning(f"Bot {self.bot_id} - Failed to get next action, trying exploratory approach")
-                    action = self.get_exploratory_action(context)
 
                 # Execute action
                 result = self.execute_action(action, step_number)
@@ -209,6 +206,7 @@ IMPORTANT:
 7) For GET_SELECT_OPTIONS, only provide the element selector and it will return the available options
 8) Be curious! Try edge cases, unusual inputs, and attempt to break things within the bounds of your directive
 9) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
+10) ONLY determine your next action based on the known current page and nothing else
 
 THAT'S AN ORDER, SOLDIER!
         """
@@ -241,94 +239,25 @@ THAT'S AN ORDER, SOLDIER!
             self.logger.error(f"Bot {self.bot_id} - Error getting next action: {str(e)}")
             return None
 
-    def get_exploratory_action(self, context):
-        """Get an exploratory action when the normal approach fails"""
-        steps_taken = self.db.get_steps(self.bot_id)
-        available_selectors = """
-Available Selenium selectors:
-1. CSS_SELECTOR: Select elements by CSS selector
-2. ID: Select element by ID attribute
-3. NAME: Select element by name attribute
-4. XPATH: Select element by XPath expression
-5. CLASS_NAME: Select element by class name
-6. TAG_NAME: Select element by HTML tag name
-7. LINK_TEXT: Select link by exact text
-8. PARTIAL_LINK_TEXT: Select link by partial text
-
-Available actions:
-1. CLICK: Click on an element
-2. SEND_KEYS: Send text to an input element
-3. SELECT_BY_VALUE: Select option in dropdown by value
-4. SELECT_BY_TEXT: Select option in dropdown by text
-5. GET_SELECT_OPTIONS: Get all options for a select element
-6. CLEAR: Clear an input field
-7. SUBMIT: Submit a form
-8. WAIT: Wait for a specific element to be present
-        """
-
-        prompt = f"""
-You are a web testing bot in EXPLORATORY MODE. Your current directive is: {context['directive']}
-
-Current page HTML (simplified):
-{context['current_page']}
-
-Steps taken:
-{self.get_step_text()}
-
-Current URL: {context['current_url']}
-
-Previous action status:
-{'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
-
-{available_selectors}
-
-Try something UNUSUAL, EDGE CASE, or POTENTIALLY BREAKING within the bounds of your directive.
-Respond ONLY with the following:
-
-```
-[newt_action_start]
-ACTION_TYPE
-[newt_action_end]
-[newt_element_start]
-ELEMENT_SELECTOR
-[newt_element_end]
-[newt_value_start]
-VALUE_TO_SEND (if applicable, otherwise leave empty)
-[newt_value_end]
-[newt_friendly_description_start]
-A user-friendly description of what this action will do
-[newt_friendly_description_end]
-[newt_reasoning_start]
-Explanation of why this is an exploratory/edge case action
-[newt_reasoning_end]
-```
-        """
-
-        try:
-            action = self.llm.get_action(prompt)
-            action_dict = {
-                "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
-                "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
-                "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
-                "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
-                "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
-            }
-            return action_dict
-        except Exception as e:
-            self.logger.error(f"Bot {self.bot_id} - Error getting exploratory action: {str(e)}")
-            return None
-
     def execute_action(self, action, step_number):
         try:
             action_type = action['action']
             element_selector = action['element']
             value = action.get('value', '')
 
-            # Determine the Selenium selector type
-            selector_type = By.ID if element_selector.startswith('#') else By.CSS_SELECTOR
+            # Determine the Selenium selector type and value
+            # Handle CSS selectors that may include spaces, classes, etc.
             if element_selector.startswith('#'):
+                # ID selector
+                selector_type = By.ID
                 selector_value = element_selector[1:]
+            elif ' ' in element_selector or ':' in element_selector or '.' in element_selector or '[' in element_selector:
+                # CSS selector (may include classes, pseudo-selectors, attributes)
+                selector_type = By.CSS_SELECTOR
+                selector_value = element_selector
             else:
+                # Simple tag name selector
+                selector_type = By.CSS_SELECTOR
                 selector_value = element_selector
 
             action_text = f"{action_type} on {element_selector}"
@@ -342,10 +271,24 @@ Explanation of why this is an exploratory/edge case action
 
             # Execute the action using Selenium
             if action_type == 'CLICK':
-                element = WebDriverWait(self.driver, self.default_wait).until(
-                    EC.element_to_be_clickable((selector_type, selector_value))
-                )
-                element.click()
+                try:
+                    element = WebDriverWait(self.driver, self.default_wait).until(
+                        EC.element_to_be_clickable((selector_type, selector_value))
+                    )
+                    element.click()
+                except Exception as e:
+                    # Fallback: try to find by CSS selector if ID selector failed
+                    if selector_type == By.ID:
+                        try:
+                            self.logger.info(f"Bot {self.bot_id} - ID selector failed, trying CSS selector")
+                            element = WebDriverWait(self.driver, self.default_wait).until(
+                                EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value))
+                            )
+                            element.click()
+                        except Exception as e2:
+                            raise Exception(f"Failed with both ID and CSS selectors: {str(e2)}")
+                    else:
+                        raise e
             elif action_type == 'SEND_KEYS':
                 element = WebDriverWait(self.driver, self.default_wait).until(
                     EC.presence_of_element_located((selector_type, selector_value))
@@ -404,7 +347,14 @@ Explanation of why this is an exploratory/edge case action
             error_msg = f"Failed to execute action {action_type} on {action['element']}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
-            full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+
+            # Try to get a screenshot even if the action failed
+            try:
+                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+            except Exception as screenshot_error:
+                self.logger.error(f"Bot {self.bot_id} - Error capturing error screenshot: {str(screenshot_error)}")
+                full_screenshot_data = None
+
             self.db.add_step(self.bot_id, step_number, error_msg, action['element'], full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
@@ -608,4 +558,7 @@ If not complete, suggest the next area to test
                              + s['friendly_description']
                              + chr(10)
                              + "Reasoning: "
-                             + s['reasoning'] for s in steps])
+                             + s['reasoning']
+                             + chr(10)
+                             + "Success: "
+                             + ("Yes" if s['success'] else "No") for s in steps])

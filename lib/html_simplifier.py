@@ -31,18 +31,21 @@ class HTMLSimplifier:
                     if input_type in ["hidden", "file"]:
                         continue
 
-                    # Build selector
+                    # Build selector - use CSS selector format
                     selector_parts = []
                     if input_id:
                         selector_parts.append(f"#{input_id}")
+                    else:
+                        # If no ID, try to build a more specific selector
+                        classes = element.get("class", [])
+                        if classes:
+                            selector_parts.append(f".{' '.join(classes)}")
+                        # Fallback to type selector
+                        selector_parts.append(f"[type='{input_type}']")
+
+                    # Add name attribute if available for more specificity
                     if input_name:
                         selector_parts.append(f"[name='{input_name}']")
-                    if input_type:
-                        selector_parts.append(f"[type='{input_type}']")
-                    if input_placeholder:
-                        selector_parts.append(f"[placeholder='{input_placeholder}']")
-                    if input_value:
-                        selector_parts.append(f"[value='{input_value}']")
 
                     # Add checked/selected attributes
                     if element.has_attr("checked"):
@@ -50,7 +53,8 @@ class HTMLSimplifier:
                     if element.has_attr("selected"):
                         selector_parts.append("[selected]")
 
-                    selector = f"input{''.join(selector_parts)}"
+                    # Join with spaces for CSS selector
+                    selector = ' '.join(selector_parts) if selector_parts else "input"
 
                     # Get associated label
                     label_text = ""
@@ -68,14 +72,20 @@ class HTMLSimplifier:
                 elif element.name == "select":
                     select_id = element.get("id", "")
                     select_name = element.get("name", "")
+                    select_class = element.get("class", [])
 
+                    # Build selector
                     selector_parts = []
                     if select_id:
                         selector_parts.append(f"#{select_id}")
-                    if select_name:
-                        selector_parts.append(f"[name='{select_name}']")
+                    else:
+                        # If no ID, use class or name
+                        if select_class:
+                            selector_parts.append(f".{' '.join(select_class)}")
+                        if select_name:
+                            selector_parts.append(f"[name='{select_name}']")
 
-                    selector = f"select{''.join(selector_parts)}"
+                    selector = ' '.join(selector_parts) if selector_parts else "select"
 
                     # Get selected option
                     selected_option = ""
@@ -91,18 +101,22 @@ class HTMLSimplifier:
                 elif element.name == "textarea":
                     textarea_id = element.get("id", "")
                     textarea_name = element.get("name", "")
+                    textarea_class = element.get("class", [])
                     textarea_placeholder = element.get("placeholder", "")
                     textarea_value = element.get_text(strip=True)
 
+                    # Build selector
                     selector_parts = []
                     if textarea_id:
                         selector_parts.append(f"#{textarea_id}")
-                    if textarea_name:
-                        selector_parts.append(f"[name='{textarea_name}']")
-                    if textarea_placeholder:
-                        selector_parts.append(f"[placeholder='{textarea_placeholder}']")
+                    else:
+                        # If no ID, use class or name
+                        if textarea_class:
+                            selector_parts.append(f".{' '.join(textarea_class)}")
+                        if textarea_name:
+                            selector_parts.append(f"[name='{textarea_name}']")
 
-                    selector = f"textarea{''.join(selector_parts)}"
+                    selector = ' '.join(selector_parts) if selector_parts else "textarea"
 
                     # Get associated label
                     label_text = ""
@@ -120,19 +134,21 @@ class HTMLSimplifier:
                     button_id = element.get("id", "")
                     button_type = element.get("type", "button")
                     button_text = element.get_text(strip=True)
+                    button_class = element.get("class", [])
 
+                    # Build selector
                     selector_parts = []
                     if button_id:
                         selector_parts.append(f"#{button_id}")
-                    if button_type:
-                        selector_parts.append(f"[type='{button_type}']")
+                    else:
+                        # If no ID, use class
+                        if button_class:
+                            selector_parts.append(f".{' '.join(button_class)}")
+                        # Add type for more specificity
+                        if button_type:
+                            selector_parts.append(f"[type='{button_type}']")
 
-                    # Add classes
-                    classes = element.get("class", [])
-                    if classes:
-                        selector_parts.append(f".{' '.join(classes)}")
-
-                    selector = f"button{''.join(selector_parts)}"
+                    selector = ' '.join(selector_parts) if selector_parts else "button"
 
                     if button_text:
                         form_elements.append(f"  {selector}: '{button_text}'")
@@ -158,14 +174,16 @@ class HTMLSimplifier:
 
             selector_parts = []
             link_id = link.get("id")
+            link_class = link.get("class", [])
+
             if link_id:
                 selector_parts.append(f"#{link_id}")
+            else:
+                # If no ID, use class
+                if link_class:
+                    selector_parts.append(f".{' '.join(link_class)}")
 
-            classes = link.get("class", [])
-            if classes:
-                selector_parts.append(f".{' '.join(classes)}")
-
-            selector = f"a{''.join(selector_parts)}"
+            selector = ' '.join(selector_parts) if selector_parts else "a"
 
             if link_text:
                 result.append(f"{selector}: '{link_text}'")
@@ -173,4 +191,4 @@ class HTMLSimplifier:
                 result.append(f"{selector}")
 
         # Return as formatted string
-        return "\n".join(result)
+        return chr(10).join(result)
