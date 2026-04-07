@@ -1,155 +1,194 @@
 from bs4 import BeautifulSoup
 
-
 class HTMLSimplifier:
-    # Elements the bot may interact with
-    INTERACTIVE_TAGS = {
-        "input", "select", "option", "textarea", "button", "a"
-    }
-
-    # Semantic and structural context
-    CONTEXT_TAGS = {
-        "label", "form", "fieldset", "legend",
-        "p", "span", "div",
-        "ul", "ol", "li",
-        "table", "thead", "tbody", "tr", "td", "th",
-        "h1", "h2", "h3", "h4", "h5", "h6",
-        "section", "article", "header", "footer", "nav", "main"
-    }
-
-    WHITELIST_TAGS = INTERACTIVE_TAGS | CONTEXT_TAGS
-
-    # Attributes needed for JS selectors or meaning
-    WHITELIST_ATTRS = {
-        "id", "name", "type", "value",
-        "checked", "selected", "href",
-        "placeholder", "for",
-        "role", "title",
-        "aria-label", "aria-labelledby", "aria-describedby"
-    }
-
     def simplify_html(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
 
-        # ---------------------------------------------------------
-        # 1. Remove obvious noise
-        # ---------------------------------------------------------
-        for tag in soup([
-            "script", "style", "noscript", "meta", "link",
-            "svg", "canvas", "img", "iframe", "object", "embed"
-        ]):
+        # Remove script, style, and other noise
+        for tag in soup(["script", "style", "noscript", "meta", "link", "svg", "canvas", "img", "iframe", "object", "embed"]):
             tag.decompose()
 
-        # ---------------------------------------------------------
-        # 2. Preserve inner text for interactive elements
-        #    BEFORE destructive operations
-        # ---------------------------------------------------------
-        self._preserve_interactive_inner_text(soup)
+        # Extract interactive elements with their context
+        result = []
 
-        # ---------------------------------------------------------
-        # 3. Remove non-whitelisted tags but keep their text
-        # ---------------------------------------------------------
-        for tag in soup.find_all(True):
-            if tag.name not in self.WHITELIST_TAGS:
-                tag.unwrap()
+        # Find all forms and their contents
+        for form in soup.find_all("form"):
+            form_id = form.get("id", "")
+            form_class = form.get("class", [])
+            form_selector = f"form{'#' + form_id if form_id else ''}{'.' + '.'.join(form_class) if form_class else ''}"
 
-        # ---------------------------------------------------------
-        # 4. Strip attributes aggressively
-        # ---------------------------------------------------------
-        for tag in soup.find_all(True):
-            attrs = dict(tag.attrs)
-            for attr in list(attrs.keys()):
-                if attr not in self.WHITELIST_ATTRS:
-                    # Keep class ONLY for interactive elements
-                    if attr == "class" and tag.name in self.INTERACTIVE_TAGS:
+            # Process form elements
+            form_elements = []
+            for element in form.find_all(["input", "select", "textarea", "button", "label"]):
+                if element.name == "input":
+                    input_id = element.get("id", "")
+                    input_name = element.get("name", "")
+                    input_type = element.get("type", "text")
+                    input_value = element.get("value", "")
+                    input_placeholder = element.get("placeholder", "")
+
+                    # Skip hidden and file inputs
+                    if input_type in ["hidden", "file"]:
                         continue
-                    del tag.attrs[attr]
 
-        # ---------------------------------------------------------
-        # 5. Normalize input elements
-        # ---------------------------------------------------------
-        self._normalize_inputs(soup)
+                    # Build selector - use CSS selector format
+                    selector_parts = []
+                    if input_id:
+                        selector_parts.append(f"#{input_id}")
+                    else:
+                        # If no ID, try to build a more specific selector
+                        classes = element.get("class", [])
+                        if classes:
+                            selector_parts.append(f".{' '.join(classes)}")
+                        # Fallback to type selector
+                        selector_parts.append(f"[type='{input_type}']")
 
-        # ---------------------------------------------------------
-        # 6. Normalize selects (keep only selected option)
-        # ---------------------------------------------------------
-        self._normalize_selects(soup)
+                    # Add name attribute if available for more specificity
+                    if input_name:
+                        selector_parts.append(f"[name='{input_name}']")
 
-        # ---------------------------------------------------------
-        # 7. Remove empty containers
-        # ---------------------------------------------------------
-        self._remove_empty_containers(soup)
+                    # Add checked/selected attributes
+                    if element.has_attr("checked"):
+                        selector_parts.append("[checked]")
+                    if element.has_attr("selected"):
+                        selector_parts.append("[selected]")
 
-        # ---------------------------------------------------------
-        # 8. Collapse whitespace
-        # ---------------------------------------------------------
-        simplified = " ".join(str(soup).split())
+                    # Join with spaces for CSS selector
+                    selector = ' '.join(selector_parts) if selector_parts else "input"
 
-        return simplified
+                    # Get associated label
+                    label_text = ""
+                    label_for = element.get("id")
+                    if label_for:
+                        label = soup.find("label", attrs={"for": label_for})
+                        if label:
+                            label_text = label.get_text(strip=True)
 
-    # ============================================================
-    # Helpers
-    # ============================================================
+                    # Add to form elements
+                    if label_text:
+                        form_elements.append(f"  label[for='{label_for}']")
+                    form_elements.append(f"  {selector}")
 
-    def _preserve_interactive_inner_text(self, soup):
-        """
-        Extracts inner text from interactive elements and injects it
-        as plain text before simplification removes nested tags.
-        """
-        for tag in soup.find_all(True):
-            if tag.name in self.INTERACTIVE_TAGS:
-                text = tag.get_text(" ", strip=True)
-                if text:
-                    tag.insert(0, text + " ")
+                elif element.name == "select":
+                    select_id = element.get("id", "")
+                    select_name = element.get("name", "")
+                    select_class = element.get("class", [])
 
-    def _normalize_inputs(self, soup):
-        for input_tag in soup.find_all("input"):
-            t = (input_tag.get("type") or "text").lower()
+                    # Build selector
+                    selector_parts = []
+                    if select_id:
+                        selector_parts.append(f"#{select_id}")
+                    else:
+                        # If no ID, use class or name
+                        if select_class:
+                            selector_parts.append(f".{' '.join(select_class)}")
+                        if select_name:
+                            selector_parts.append(f"[name='{select_name}']")
 
-            if t == "text":
-                input_tag["value"] = input_tag.get("value", "")
-            elif t in ("checkbox", "radio"):
-                if input_tag.has_attr("checked"):
-                    input_tag["checked"] = "checked"
-                else:
-                    input_tag.attrs.pop("checked", None)
-            elif t in ("submit", "button", "reset"):
-                pass
+                    selector = ' '.join(selector_parts) if selector_parts else "select"
+
+                    # Get selected option
+                    selected_option = ""
+                    for option in element.find_all("option"):
+                        if option.has_attr("selected"):
+                            selected_option = option.get_text(strip=True)
+                            break
+
+                    form_elements.append(f"  {selector}")
+                    if selected_option:
+                        form_elements.append(f"    option: '{selected_option}'")
+
+                elif element.name == "textarea":
+                    textarea_id = element.get("id", "")
+                    textarea_name = element.get("name", "")
+                    textarea_class = element.get("class", [])
+                    textarea_placeholder = element.get("placeholder", "")
+                    textarea_value = element.get_text(strip=True)
+
+                    # Build selector
+                    selector_parts = []
+                    if textarea_id:
+                        selector_parts.append(f"#{textarea_id}")
+                    else:
+                        # If no ID, use class or name
+                        if textarea_class:
+                            selector_parts.append(f".{' '.join(textarea_class)}")
+                        if textarea_name:
+                            selector_parts.append(f"[name='{textarea_name}']")
+
+                    selector = ' '.join(selector_parts) if selector_parts else "textarea"
+
+                    # Get associated label
+                    label_text = ""
+                    label_for = element.get("id")
+                    if label_for:
+                        label = soup.find("label", attrs={"for": label_for})
+                        if label:
+                            label_text = label.get_text(strip=True)
+
+                    if label_text:
+                        form_elements.append(f"  label[for='{label_for}']")
+                    form_elements.append(f"  {selector}")
+
+                elif element.name == "button":
+                    button_id = element.get("id", "")
+                    button_type = element.get("type", "button")
+                    button_text = element.get_text(strip=True)
+                    button_class = element.get("class", [])
+
+                    # Build selector
+                    selector_parts = []
+                    if button_id:
+                        selector_parts.append(f"#{button_id}")
+                    else:
+                        # If no ID, use class
+                        if button_class:
+                            selector_parts.append(f".{' '.join(button_class)}")
+                        # Add type for more specificity
+                        if button_type:
+                            selector_parts.append(f"[type='{button_type}']")
+
+                    selector = ' '.join(selector_parts) if selector_parts else "button"
+
+                    if button_text:
+                        form_elements.append(f"  {selector}: '{button_text}'")
+                    else:
+                        form_elements.append(f"  {selector}")
+
+                elif element.name == "label":
+                    label_for = element.get("for", "")
+                    label_text = element.get_text(strip=True)
+
+                    if label_for:
+                        form_elements.append(f"  label[for='{label_for}']")
+
+            if form_elements:
+                result.append(form_selector)
+                result.extend(form_elements)
+                result.append("")
+
+        # Find all links
+        for link in soup.find_all("a", href=True):
+            link_text = link.get_text(strip=True)
+            link_href = link.get("href")
+
+            selector_parts = []
+            link_id = link.get("id")
+            link_class = link.get("class", [])
+
+            if link_id:
+                selector_parts.append(f"#{link_id}")
             else:
-                # Remove irrelevant input types
-                input_tag.decompose()
+                # If no ID, use class
+                if link_class:
+                    selector_parts.append(f".{' '.join(link_class)}")
 
-    def _normalize_selects(self, soup):
-        for select_tag in soup.find_all("select"):
-            options = select_tag.find_all("option")
-            if not options:
-                continue
+            selector = ' '.join(selector_parts) if selector_parts else "a"
 
-            selected = next((o for o in options if o.has_attr("selected")), None)
-            if not selected:
-                selected = options[0]
+            if link_text:
+                result.append(f"{selector}: '{link_text}'")
+            else:
+                result.append(f"{selector}")
 
-            # Keep only the selected option
-            for option in options:
-                if option is not selected:
-                    option.decompose()
-
-            selected["selected"] = "selected"
-
-    def _remove_empty_containers(self, soup):
-        """
-        Remove non-interactive tags that have no text and no children.
-        """
-        changed = True
-        while changed:
-            changed = False
-            for tag in list(soup.find_all(True)):
-                if tag.name in self.INTERACTIVE_TAGS:
-                    continue
-
-                has_text = bool(tag.get_text(strip=True))
-                has_children = bool(tag.find(True))
-
-                if not has_text and not has_children:
-                    tag.decompose()
-                    changed = True
+        # Return as formatted string
+        return chr(10).join(result)
