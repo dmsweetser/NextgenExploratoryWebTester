@@ -88,7 +88,7 @@ class BotThread(threading.Thread):
                 # Check for bugs
                 try:
                     analysis_result, analysis = self.detect_bug()
-                    if analysis_result is True:
+                    if str(analysis_result).lower() == "true":
                         self.report_bug(action, result, context, analysis)
                 except Exception as e:
                     self.logger.error(f"Bot {self.bot_id} - Error in bug detection: {str(e)}")
