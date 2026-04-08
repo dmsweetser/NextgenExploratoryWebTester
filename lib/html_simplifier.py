@@ -89,14 +89,15 @@ class HTMLSimplifier:
 
                     # Get selected option
                     selected_option = ""
-                    for option in element.find_all("option"):
+                    all_options = element.find_all("option")
+                    for option in all_options:
                         if option.has_attr("selected"):
                             selected_option = option.get_text(strip=True)
                             break
 
                     form_elements.append(f"  {selector}")
                     if selected_option:
-                        form_elements.append(f"    option: '{selected_option}'")
+                        form_elements.append(f"    option: '{selected_option}' <!-- {len(all_options)} other options are present but ommitted here for brevity -->")
 
                 elif element.name == "textarea":
                     textarea_id = element.get("id", "")
