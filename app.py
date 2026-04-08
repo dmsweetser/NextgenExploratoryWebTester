@@ -128,14 +128,14 @@ def export_bug(bug_id):
     }
 
     # Create text summary
-    text_summary = f"Bug #{bug['id']} - {bug['summary']}\n"
-    text_summary += f"Bot: {bug.get('bot_name', 'Unknown Bot')}\n"
-    text_summary += f"Status: {bug['status']}\n"
-    text_summary += f"Reported: {bug['reported_at']}\n"
-    text_summary += "\nSteps:\n"
+    text_summary = f"Bug #{bug['id']} - {bug['summary']}" + chr(10)
+    text_summary += f"Bot: {bug.get('bot_name', 'Unknown Bot')}" + chr(10)
+    text_summary += f"Status: {bug['status']}" + chr(10)
+    text_summary += f"Reported: {bug['reported_at']}" + chr(10)
+    text_summary += chr(10) + "Steps:" + chr(10)
     for step in steps:
-        text_summary += f"- Step {step['step_number']}: {step['action']}\n"
-    text_summary += "\nKnowledge:\n"
+        text_summary += f"- Step {step['step_number']}: {step['action']}" + chr(10)
+    text_summary += chr(10) + "Knowledge:" + chr(10)
     text_summary += knowledge
 
     # Create ZIP file
