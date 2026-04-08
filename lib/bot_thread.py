@@ -163,6 +163,8 @@ You are a web testing bot. Your current directive is: {context['directive']}
 Current page HTML (simplified):
 {context['current_page']}
 
+{f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
+
 Known bugs to avoid:
 {context['known_bugs']}
 
@@ -175,8 +177,6 @@ Previous action status:
 {'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
 
 {available_selectors}
-
-{f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
 What should your next action be? Respond ONLY with the following:
 
@@ -384,6 +384,8 @@ Known bugs:
 Page content:
 {simplified_html}
 
+{f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
+
 Consider:
 1. Any error messages, exceptions, or malfunctions
 2. Logical blocking - elements that should be interactive but aren't
@@ -470,6 +472,8 @@ Known bugs to avoid:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
 Current page content: {simplified_html}
+
+{f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
 Consider:
 1. Has the directive been fully satisfied?
