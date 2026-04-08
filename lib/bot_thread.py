@@ -253,7 +253,6 @@ THAT'S AN ORDER, SOLDIER!
             value = action.get('value', '')
             friendly_description = action.get('friendly_description', '')
             reasoning = action.get('reasoning', '')
-            element = action.get('element', f"{element_selector_type}:{element_selector_value}")
 
             # Map selector type to Selenium By enum
             selector_map = {
@@ -351,7 +350,7 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                 full_screenshot_data = None
 
-            self.db.add_step(self.bot_id, step_number, action_text, element, full_screenshot_data, friendly_description, reasoning)
+            self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, friendly_description, reasoning)
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             result = {'success': True, 'screenshot': full_screenshot_data}
@@ -369,7 +368,7 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(f"Bot {self.bot_id} - Error capturing error screenshot: {str(screenshot_error)}")
                 full_screenshot_data = None
 
-            self.db.add_step(self.bot_id, step_number, error_msg, element, full_screenshot_data, friendly_description, reasoning, False)
+            self.db.add_step(self.bot_id, step_number, error_msg, action['element'], full_screenshot_data, friendly_description, reasoning, False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
