@@ -176,15 +176,20 @@ Previous action status:
 
 {available_selectors}
 
+{f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
+
 What should your next action be? Respond ONLY with the following:
 
 ```
 [newt_action_start]
 ACTION_TYPE
 [newt_action_end]
-[newt_element_start]
-ELEMENT_SELECTOR
-[newt_element_end]
+[newt_element_selector_type_start]
+SELECTOR_TYPE (CSS_SELECTOR, ID, NAME, XPATH, CLASS_NAME, TAG_NAME, LINK_TEXT, PARTIAL_LINK_TEXT)
+[newt_element_selector_type_end]
+[newt_element_selector_value_start]
+SELECTOR_VALUE
+[newt_element_selector_value_end]
 [newt_value_start]
 VALUE_TO_SEND (if applicable, otherwise leave empty)
 [newt_value_end]
@@ -228,7 +233,8 @@ THAT'S AN ORDER, SOLDIER!
 
             action_dict = {
                 "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
-                "element": extract_line_based_content(action, "[newt_element_start]", "[newt_element_end]"),
+                "element_selector_type": extract_line_based_content(action, "[newt_element_selector_type_start]", "[newt_element_selector_type_end]"),
+                "element_selector_value": extract_line_based_content(action, "[newt_element_selector_value_start]", "[newt_element_selector_value_end]"),
                 "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
                 "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
                 "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
@@ -241,26 +247,28 @@ THAT'S AN ORDER, SOLDIER!
 
     def execute_action(self, action, step_number):
         try:
+            self.select_options_cache = {}
             action_type = action['action']
-            element_selector = action['element']
+            element_selector_type = action.get('element_selector_type', 'CSS_SELECTOR')
+            element_selector_value = action.get('element_selector_value', '')
             value = action.get('value', '')
 
-            # Determine the Selenium selector type and value
-            # Handle CSS selectors that may include spaces, classes, etc.
-            if element_selector.startswith('#'):
-                # ID selector
-                selector_type = By.ID
-                selector_value = element_selector[1:]
-            elif ' ' in element_selector or ':' in element_selector or '.' in element_selector or '[' in element_selector:
-                # CSS selector (may include classes, pseudo-selectors, attributes)
-                selector_type = By.CSS_SELECTOR
-                selector_value = element_selector
-            else:
-                # Simple tag name selector
-                selector_type = By.CSS_SELECTOR
-                selector_value = element_selector
+            # Map selector type to Selenium By enum
+            selector_map = {
+                'CSS_SELECTOR': By.CSS_SELECTOR,
+                'ID': By.ID,
+                'NAME': By.NAME,
+                'XPATH': By.XPATH,
+                'CLASS_NAME': By.CLASS_NAME,
+                'TAG_NAME': By.TAG_NAME,
+                'LINK_TEXT': By.LINK_TEXT,
+                'PARTIAL_LINK_TEXT': By.PARTIAL_LINK_TEXT
+            }
 
-            action_text = f"{action_type} on {element_selector}"
+            selector_type = selector_map.get(element_selector_type, By.CSS_SELECTOR)
+            selector_value = element_selector_value
+
+            action_text = f"{action_type} on {element_selector_type}:{element_selector_value}"
 
             # Capture screenshot before action
             try:
@@ -310,8 +318,8 @@ THAT'S AN ORDER, SOLDIER!
                     EC.presence_of_element_located((selector_type, selector_value))
                 ))
                 options = [opt.text for opt in select.options]
-                self.select_options_cache[element_selector] = options
-                action_text = f"Got select options for {element_selector}: {', '.join(options)}"
+                self.select_options_cache[selector_value] = options
+                action_text = f"Got select options for {selector_value}: {', '.join(options)}"
             elif action_type == 'CLEAR':
                 element = WebDriverWait(self.driver, self.default_wait).until(
                     EC.presence_of_element_located((selector_type, selector_value))
@@ -337,7 +345,7 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                 full_screenshot_data = None
 
-            self.db.add_step(self.bot_id, step_number, action_text, element_selector, full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
+            self.db.add_step(self.bot_id, step_number, action_text, f"{element_selector_type}:{element_selector_value}", full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             result = {'success': True, 'screenshot': full_screenshot_data}
@@ -355,7 +363,9 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(f"Bot {self.bot_id} - Error capturing error screenshot: {str(screenshot_error)}")
                 full_screenshot_data = None
 
-            self.db.add_step(self.bot_id, step_number, error_msg, action['element'], full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
+            element_selector_type = action.get('element_selector_type', 'CSS_SELECTOR')
+            element_selector_value = action.get('element_selector_value', '')
+            self.db.add_step(self.bot_id, step_number, error_msg, f"{element_selector_type}:{element_selector_value}", full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
