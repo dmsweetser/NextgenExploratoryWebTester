@@ -160,7 +160,7 @@ For GET_SELECT_OPTIONS, specify the element selector and it will return all avai
         prompt = f"""
 You are a web testing bot. Your current directive is: {context['directive']}
 
-Current page HTML (simplified):
+Current page HTML (simplified - for any select, only the selected option is provided for brevity):
 {context['current_page']}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
@@ -381,7 +381,7 @@ Steps taken:
 Known bugs:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
-Page content:
+Current page HTML (simplified - for any select, only the selected option is provided for brevity):
 {simplified_html}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
@@ -471,7 +471,8 @@ Steps taken:
 Known bugs to avoid:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
-Current page content: {simplified_html}
+Current page HTML (simplified - for any select, only the selected option is provided for brevity):
+{simplified_html}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
