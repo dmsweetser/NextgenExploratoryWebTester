@@ -75,10 +75,13 @@
 </div>
 
 <div class="card mb-4">
-    <div class="card-header">
-        <i class="bi bi-list-ul"></i> NEWT Execution Steps
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-list-ul"></i> NEWT Execution Steps
+        </div>
+        <span class="badge bg-info">{{ steps|length }} steps</span>
     </div>
-    <div class="card-body">
+    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
         {% if steps %}
         <div class="timeline">
             {% for step in steps %}
@@ -93,20 +96,20 @@
                     </div>
                     <div class="collapse mt-2" id="stepDetails-{{ step['id'] }}">
                         <div class="card card-body bg-light">
-                            <p><strong>Action:</strong> <pre>{{ step['action'] }}</pre></p>
-                            <p><strong>Reasoning:</strong> {{ step['reasoning'] }}</p>
+                            <p><strong>Action:</strong> <pre style="white-space: pre-wrap; word-wrap: break-word;">{{ step['action'] }}</pre></p>
+                            <p><strong>Reasoning:</strong> <span style="white-space: pre-wrap; word-wrap: break-word;">{{ step['reasoning'] }}</span></p>
                             <p><strong>Success:</strong> {% if step['success'] %}<span class="text-success">Yes</span>{% else %}<span class="text-danger">No</span>{% endif %}</p>
                             {% if step['element'] %}
-                            <p><strong>Element:</strong> {{ step['element'] }}</p>
+                            <p><strong>Element:</strong> <code>{{ step['element'] }}</code></p>
                             {% endif %}
                         </div>
                     </div>
                     {% endif %}
                     {% if step['screenshot_data'] %}
-                    <img src="data:image/png;base64,{{ step['screenshot_data'] }}" class="screenshot-thumb"
+                    <img src="data:image/png;base64,{{ step['screenshot_data'] }}" class="screenshot-thumb img-thumbnail"
                         alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')">
                     {% endif %}
-                    <p class="text-muted"><small>Selector: {{ step['element'] }}</small></p>
+                    <p class="text-muted"><small>Selector: <code>{{ step['element'] }}</code></small></p>
                 </div>
             </div>
             {% endfor %}
@@ -166,7 +169,56 @@
     <div class="card-body">
         <div class="alert alert-success">
             <h5>Testing Complete</h5>
-            <p>The NEWT bot has completed its testing cycle. Review the steps taken and any bugs found above.</p>
+            <p>The NEWT bot has completed its testing cycle.</p>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header bg-light">
+                <i class="bi bi-file-earmark-text"></i> Test Evaluation
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-bar-chart"></i> Test Statistics</h6>
+                        <ul class="list-group list-group-flush mb-3">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Total Steps Taken
+                                <span class="badge bg-primary rounded-pill">{{ steps|length }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Successful Steps
+                                <span class="badge bg-success rounded-pill">{{ steps|selectattr('success', 'equalto', true)|list|length }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Failed Steps
+                                <span class="badge bg-danger rounded-pill">{{ steps|selectattr('success', 'equalto', false)|list|length }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Bugs Found
+                                <span class="badge bg-warning rounded-pill">{{ bugs|length }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-lightbulb"></i> Test Summary</h6>
+                        <div class="card">
+                            <div class="card-body">
+                                <p>The NEWT bot has completed testing according to its directive: <em>"{{ bot['directive'] }}"</em>.</p>
+                                <p>The bot explored the application starting from <a href="{{ bot['start_url'] }}" target="_blank">{{ bot['start_url'] }}</a> and took {{ steps|length }} actions to identify potential issues.</p>
+                                {% if bugs|length > 0 %}
+                                <p class="mb-0"><strong>Key Findings:</strong></p>
+                                <ul>
+                                    {% for bug in bugs %}
+                                    <li>{{ bug['summary'] }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <p>The bot did not identify any significant bugs during this testing session.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
