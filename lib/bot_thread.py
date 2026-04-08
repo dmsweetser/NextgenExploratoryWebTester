@@ -153,14 +153,12 @@ Available actions:
 6. CLEAR: Clear an input field
 7. SUBMIT: Submit a form
 8. WAIT: Wait for a specific element to be present
-
-For GET_SELECT_OPTIONS, specify the element selector and it will return all available options.
         """
 
         prompt = f"""
 You are a web testing bot. Your current directive is: {context['directive']}
 
-Current page HTML (simplified - for any select, only the selected option is provided for brevity):
+Current page HTML (simplified):
 {context['current_page']}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
@@ -233,11 +231,12 @@ THAT'S AN ORDER, SOLDIER!
 
             action_dict = {
                 "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
-                "element_selector_type": extract_line_based_content(action, "[newt_element_selector_type_start]", "[newt_element_selector_type_end]"),
-                "element_selector_value": extract_line_based_content(action, "[newt_element_selector_value_start]", "[newt_element_selector_value_end]"),
-                "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]"),
-                "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]"),
-                "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]"),
+                "element_selector_type": extract_line_based_content(action, "[newt_element_selector_type_start]", "[newt_element_selector_type_end]") or "CSS_SELECTOR",
+                "element_selector_value": extract_line_based_content(action, "[newt_element_selector_value_start]", "[newt_element_selector_value_end]") or "",
+                "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]") or "",
+                "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]") or "",
+                "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]") or "",
+                "element": f"{extract_line_based_content(action, '[newt_element_selector_type_start]', '[newt_element_selector_type_end]') or 'CSS_SELECTOR'}:{extract_line_based_content(action, '[newt_element_selector_value_start]', '[newt_element_selector_value_end]') or ''}"
             }
 
             return action_dict
@@ -248,10 +247,13 @@ THAT'S AN ORDER, SOLDIER!
     def execute_action(self, action, step_number):
         try:
             self.select_options_cache = {}
-            action_type = action['action']
+            action_type = action.get('action', '')
             element_selector_type = action.get('element_selector_type', 'CSS_SELECTOR')
             element_selector_value = action.get('element_selector_value', '')
             value = action.get('value', '')
+            friendly_description = action.get('friendly_description', '')
+            reasoning = action.get('reasoning', '')
+            element = action.get('element', f"{element_selector_type}:{element_selector_value}")
 
             # Map selector type to Selenium By enum
             selector_map = {
@@ -283,7 +285,9 @@ THAT'S AN ORDER, SOLDIER!
                     element = WebDriverWait(self.driver, self.default_wait).until(
                         EC.element_to_be_clickable((selector_type, selector_value))
                     )
+                    self.highlight_element(element)
                     element.click()
+                    self.unhighlight_element(element)
                 except Exception as e:
                     # Fallback: try to find by CSS selector if ID selector failed
                     if selector_type == By.ID:
@@ -292,7 +296,9 @@ THAT'S AN ORDER, SOLDIER!
                             element = WebDriverWait(self.driver, self.default_wait).until(
                                 EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value))
                             )
+                            self.highlight_element(element)
                             element.click()
+                            self.unhighlight_element(element)
                         except Exception as e2:
                             raise Exception(f"Failed with both ID and CSS selectors: {str(e2)}")
                     else:
@@ -345,7 +351,7 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
                 full_screenshot_data = None
 
-            self.db.add_step(self.bot_id, step_number, action_text, f"{element_selector_type}:{element_selector_value}", full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''))
+            self.db.add_step(self.bot_id, step_number, action_text, element, full_screenshot_data, friendly_description, reasoning)
             self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
             result = {'success': True, 'screenshot': full_screenshot_data}
@@ -363,9 +369,7 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(f"Bot {self.bot_id} - Error capturing error screenshot: {str(screenshot_error)}")
                 full_screenshot_data = None
 
-            element_selector_type = action.get('element_selector_type', 'CSS_SELECTOR')
-            element_selector_value = action.get('element_selector_value', '')
-            self.db.add_step(self.bot_id, step_number, error_msg, f"{element_selector_type}:{element_selector_value}", full_screenshot_data, action.get('friendly_description', ''), action.get('reasoning', ''), False)
+            self.db.add_step(self.bot_id, step_number, error_msg, element, full_screenshot_data, friendly_description, reasoning, False)
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
@@ -381,7 +385,7 @@ Steps taken:
 Known bugs:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
-Current page HTML (simplified - for any select, only the selected option is provided for brevity):
+Current page HTML (simplified):
 {simplified_html}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
@@ -471,7 +475,7 @@ Steps taken:
 Known bugs to avoid:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
-Current page HTML (simplified - for any select, only the selected option is provided for brevity):
+Current page HTML (simplified):
 {simplified_html}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
