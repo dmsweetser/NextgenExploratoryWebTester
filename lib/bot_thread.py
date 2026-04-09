@@ -67,14 +67,19 @@ class BotThread(threading.Thread):
                     logging.warning(f"Bot {self.bot_id} attempted to navigate to different domain: {current_url}")
                     break
 
-                # Build context for LLM
+                # Build context for LLM with failure tracking
+                steps_taken = self.db.get_steps(self.bot_id)
+                recent_failures = sum(1 for step in steps_taken[-5:] if not step['success'])
+
                 context = {
                     'directive': self.directive,
                     'current_page': simplified_html,
                     'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
-                    'steps_taken': self.db.get_steps(self.bot_id),
+                    'steps_taken': steps_taken,
                     'current_url': current_url,
-                    'select_options_cache': self.select_options_cache
+                    'select_options_cache': self.select_options_cache,
+                    'recent_failures': recent_failures,
+                    'failure_count': self.failure_count
                 }
 
                 action = self.get_next_action(context)
@@ -172,6 +177,11 @@ Current URL: {context['current_url']}
 
 Previous action status:
 {'SUCCESS' if len(steps_taken) > 0 and steps_taken[-1]['success'] else 'FAILED' if len(steps_taken) > 0 else 'N/A'}
+
+Recent failures in last 5 steps: {context['recent_failures']}
+Total failures: {context['failure_count']}
+
+IMPORTANT: If you have failed 3 or more times in a row, or if you see you are not making progress, you MUST try a completely different approach!
 
 {available_selectors}
 

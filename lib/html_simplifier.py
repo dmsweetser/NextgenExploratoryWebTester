@@ -36,14 +36,23 @@ class HTMLSimplifier:
             return " > ".join(reversed(parts))
 
         # ---------------------------------------
-        # Convert attributes to a readable string
+        # Convert attributes to a readable string - only include relevant attributes
         # ---------------------------------------
         def attr_string(el):
+            relevant_attrs = ['id', 'name', 'type', 'value', 'href', 'placeholder', 'disabled', 'readonly', 'required', 'checked', 'selected']
             attrs = []
             for key, value in el.attrs.items():
-                if key == "class":
-                    value = " ".join(value)
-                attrs.append(f"{key}='{value}'")
+                if key in relevant_attrs or key.startswith('data-'):
+                    if key == "class":
+                        # Only include classes that affect display/accessibility
+                        display_classes = [c for c in value if c in ['active', 'disabled', 'hidden', 'visible', 'show', 'hide', 'collapsed', 'expanded']]
+                        if display_classes:
+                            value = " ".join(display_classes)
+                            attrs.append(f"{key}='{value}'")
+                    else:
+                        if isinstance(value, list):
+                            value = " ".join(value)
+                        attrs.append(f"{key}='{value}'")
             return " ".join(attrs) if attrs else ""
 
         # ---------------------------------------

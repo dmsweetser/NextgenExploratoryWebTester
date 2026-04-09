@@ -133,12 +133,14 @@ body {
 
 .screenshot-thumb {
     max-width: 250px;
+    max-height: 250px;
     height: auto;
     border: 1px solid #ddd;
     margin-top: 10px;
     display: block;
     cursor: pointer;
     transition: transform 0.2s;
+    object-fit: contain;
 }
 
 .screenshot-thumb:hover {
