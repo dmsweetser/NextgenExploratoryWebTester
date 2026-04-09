@@ -1,195 +1,151 @@
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 class HTMLSimplifier:
     def simplify_html(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
 
-        # Remove script, style, and other noise
-        for tag in soup(["script", "style", "noscript", "meta", "link", "svg", "canvas", "img", "iframe", "object", "embed"]):
+        # Remove noise tags entirely
+        for tag in soup([
+            "script", "style", "noscript", "meta", "link",
+            "svg", "canvas", "img", "iframe", "object", "embed"
+        ]):
             tag.decompose()
 
-        # Extract interactive elements with their context
         result = []
 
-        # Find all forms and their contents
-        for form in soup.find_all("form"):
-            form_id = form.get("id", "")
-            form_class = form.get("class", [])
-            form_selector = f"form{'#' + form_id if form_id else ''}{'.' + '.'.join(form_class) if form_class else ''}"
+        # ---------------------------------------
+        # Build a full selector including parents
+        # ---------------------------------------
+        def full_selector(el):
+            parts = []
+            node = el
+            while node and hasattr(node, "name"):
+                tag = node.name
+                el_id = node.get("id")
+                el_class = node.get("class", [])
 
-            # Process form elements
-            form_elements = []
-            for element in form.find_all(["input", "select", "textarea", "button", "label"]):
-                if element.name == "input":
-                    input_id = element.get("id", "")
-                    input_name = element.get("name", "")
-                    input_type = element.get("type", "text")
-                    input_value = element.get("value", "")
-                    input_placeholder = element.get("placeholder", "")
+                seg = tag
+                if el_id:
+                    seg += f"#{el_id}"
+                if el_class:
+                    seg += "." + ".".join(el_class)
 
-                    # Skip hidden and file inputs
-                    if input_type in ["hidden", "file"]:
-                        continue
+                parts.append(seg)
+                node = node.parent
 
-                    # Build selector - use CSS selector format
-                    selector_parts = []
-                    if input_id:
-                        selector_parts.append(f"#{input_id}")
+            return " > ".join(reversed(parts))
+
+        # ---------------------------------------
+        # Convert attributes to a readable string
+        # ---------------------------------------
+        def attr_string(el):
+            attrs = []
+            for key, value in el.attrs.items():
+                if key == "class":
+                    value = " ".join(value)
+                attrs.append(f"{key}='{value}'")
+            return " ".join(attrs) if attrs else ""
+
+        # ---------------------------------------
+        # Process each element in DOM order
+        # ---------------------------------------
+        def process(el):
+            # Skip text nodes safely
+            if isinstance(el, NavigableString):
+                return
+
+            tag = el.name
+            sel = full_selector(el)
+            attrs = attr_string(el)
+
+            # TEXT‑BEARING TAGS (including div)
+            if tag in [
+                "h1","h2","h3","h4","h5","h6",
+                "p","span","li","strong","em","b","i",
+                "div"
+            ]:
+                text = el.get_text(strip=True)
+                if text:
+                    if attrs:
+                        result.append(f"{sel} [{attrs}]: '{text}'")
                     else:
-                        # If no ID, try to build a more specific selector
-                        classes = element.get("class", [])
-                        if classes:
-                            selector_parts.append(f".{' '.join(classes)}")
-                        # Fallback to type selector
-                        selector_parts.append(f"[type='{input_type}']")
+                        result.append(f"{sel}: '{text}'")
+                else:
+                    if attrs:
+                        result.append(f"{sel} [{attrs}]")
+                return
 
-                    # Add name attribute if available for more specificity
-                    if input_name:
-                        selector_parts.append(f"[name='{input_name}']")
+            # LINKS
+            if tag == "a" and el.get("href"):
+                text = el.get_text(strip=True)
+                href = el.get("href")
+                base = f"{sel} [{attrs}]" if attrs else sel
 
-                    # Add checked/selected attributes
-                    if element.has_attr("checked"):
-                        selector_parts.append("[checked]")
-                    if element.has_attr("selected"):
-                        selector_parts.append("[selected]")
+                if text:
+                    result.append(f"{base}: '{text}' ({href})")
+                else:
+                    result.append(f"{base} ({href})")
+                return
 
-                    # Join with spaces for CSS selector
-                    selector = ' '.join(selector_parts) if selector_parts else "input"
+            # GENERIC ELEMENTS (form, div, button, label, etc.)
+            if tag not in ["input", "select", "textarea"]:
+                if attrs:
+                    result.append(f"{sel} [{attrs}]")
+                else:
+                    result.append(sel)
+                return
 
-                    # Get associated label
-                    label_text = ""
-                    label_for = element.get("id")
-                    if label_for:
-                        label = soup.find("label", attrs={"for": label_for})
-                        if label:
-                            label_text = label.get_text(strip=True)
+            # INPUT
+            if tag == "input":
+                input_type = el.get("type", "text")
+                if input_type in ["hidden", "file"]:
+                    return
 
-                    # Add to form elements
-                    if label_text:
-                        form_elements.append(f"  label[for='{label_for}']")
-                    form_elements.append(f"  {selector}")
+                if attrs:
+                    result.append(f"{sel} [{attrs}]")
+                else:
+                    result.append(sel)
+                return
 
-                elif element.name == "select":
-                    select_id = element.get("id", "")
-                    select_name = element.get("name", "")
-                    select_class = element.get("class", [])
+            # SELECT
+            if tag == "select":
+                if attrs:
+                    result.append(f"{sel} [{attrs}]")
+                else:
+                    result.append(sel)
 
-                    # Build selector
-                    selector_parts = []
-                    if select_id:
-                        selector_parts.append(f"#{select_id}")
+                options = el.find_all("option")
+                selected = None
+                for opt in options:
+                    if opt.has_attr("selected"):
+                        selected = opt.get_text(strip=True)
+                        break
+
+                if selected:
+                    result.append(
+                        f"{sel} > option: '{selected}'  <!-- {len(options)} total -->"
+                    )
+                return
+
+            # TEXTAREA
+            if tag == "textarea":
+                text = el.get_text(strip=True)
+                if attrs:
+                    if text:
+                        result.append(f"{sel} [{attrs}]: '{text}'")
                     else:
-                        # If no ID, use class or name
-                        if select_class:
-                            selector_parts.append(f".{' '.join(select_class)}")
-                        if select_name:
-                            selector_parts.append(f"[name='{select_name}']")
-
-                    selector = ' '.join(selector_parts) if selector_parts else "select"
-
-                    # Get selected option
-                    selected_option = ""
-                    all_options = element.find_all("option")
-                    for option in all_options:
-                        if option.has_attr("selected"):
-                            selected_option = option.get_text(strip=True)
-                            break
-
-                    form_elements.append(f"  {selector}")
-                    if selected_option:
-                        form_elements.append(f"    option: '{selected_option}' <!-- {len(all_options)} other options are present but ommitted here for brevity -->")
-
-                elif element.name == "textarea":
-                    textarea_id = element.get("id", "")
-                    textarea_name = element.get("name", "")
-                    textarea_class = element.get("class", [])
-                    textarea_placeholder = element.get("placeholder", "")
-                    textarea_value = element.get_text(strip=True)
-
-                    # Build selector
-                    selector_parts = []
-                    if textarea_id:
-                        selector_parts.append(f"#{textarea_id}")
+                        result.append(f"{sel} [{attrs}]")
+                else:
+                    if text:
+                        result.append(f"{sel}: '{text}'")
                     else:
-                        # If no ID, use class or name
-                        if textarea_class:
-                            selector_parts.append(f".{' '.join(textarea_class)}")
-                        if textarea_name:
-                            selector_parts.append(f"[name='{textarea_name}']")
+                        result.append(sel)
+                return
 
-                    selector = ' '.join(selector_parts) if selector_parts else "textarea"
+        # ---------------------------------------
+        # DOM‑ORDER WALK (safe for text nodes)
+        # ---------------------------------------
+        for el in soup.body.descendants if soup.body else soup.descendants:
+            process(el)
 
-                    # Get associated label
-                    label_text = ""
-                    label_for = element.get("id")
-                    if label_for:
-                        label = soup.find("label", attrs={"for": label_for})
-                        if label:
-                            label_text = label.get_text(strip=True)
-
-                    if label_text:
-                        form_elements.append(f"  label[for='{label_for}']")
-                    form_elements.append(f"  {selector}")
-
-                elif element.name == "button":
-                    button_id = element.get("id", "")
-                    button_type = element.get("type", "button")
-                    button_text = element.get_text(strip=True)
-                    button_class = element.get("class", [])
-
-                    # Build selector
-                    selector_parts = []
-                    if button_id:
-                        selector_parts.append(f"#{button_id}")
-                    else:
-                        # If no ID, use class
-                        if button_class:
-                            selector_parts.append(f".{' '.join(button_class)}")
-                        # Add type for more specificity
-                        if button_type:
-                            selector_parts.append(f"[type='{button_type}']")
-
-                    selector = ' '.join(selector_parts) if selector_parts else "button"
-
-                    if button_text:
-                        form_elements.append(f"  {selector}: '{button_text}'")
-                    else:
-                        form_elements.append(f"  {selector}")
-
-                elif element.name == "label":
-                    label_for = element.get("for", "")
-                    label_text = element.get_text(strip=True)
-
-                    if label_for:
-                        form_elements.append(f"  label[for='{label_for}']")
-
-            if form_elements:
-                result.append(form_selector)
-                result.extend(form_elements)
-                result.append("")
-
-        # Find all links
-        for link in soup.find_all("a", href=True):
-            link_text = link.get_text(strip=True)
-            link_href = link.get("href")
-
-            selector_parts = []
-            link_id = link.get("id")
-            link_class = link.get("class", [])
-
-            if link_id:
-                selector_parts.append(f"#{link_id}")
-            else:
-                # If no ID, use class
-                if link_class:
-                    selector_parts.append(f".{' '.join(link_class)}")
-
-            selector = ' '.join(selector_parts) if selector_parts else "a"
-
-            if link_text:
-                result.append(f"{selector}: '{link_text}'")
-            else:
-                result.append(f"{selector}")
-
-        # Return as formatted string
-        return chr(10).join(result)
+        return "\n".join(result)
