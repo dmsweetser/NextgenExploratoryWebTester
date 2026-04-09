@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 class HTMLSimplifier:
     def simplify_html(self, html: str) -> str:
@@ -41,7 +41,6 @@ class HTMLSimplifier:
         def attr_string(el):
             attrs = []
             for key, value in el.attrs.items():
-                # Normalize class lists
                 if key == "class":
                     value = " ".join(value)
                 attrs.append(f"{key}='{value}'")
@@ -51,6 +50,10 @@ class HTMLSimplifier:
         # Process each element in DOM order
         # ---------------------------------------
         def process(el):
+            # Skip text nodes safely
+            if isinstance(el, NavigableString):
+                return
+
             tag = el.name
             sel = full_selector(el)
             attrs = attr_string(el)
@@ -76,10 +79,7 @@ class HTMLSimplifier:
             if tag == "a" and el.get("href"):
                 text = el.get_text(strip=True)
                 href = el.get("href")
-                if attrs:
-                    base = f"{sel} [{attrs}]"
-                else:
-                    base = sel
+                base = f"{sel} [{attrs}]" if attrs else sel
 
                 if text:
                     result.append(f"{base}: '{text}' ({href})")
@@ -87,8 +87,7 @@ class HTMLSimplifier:
                     result.append(f"{base} ({href})")
                 return
 
-            # GENERIC ELEMENTS (including form, button, label, etc.)
-            # Inputs, selects, textareas get special handling below
+            # GENERIC ELEMENTS (form, div, button, label, etc.)
             if tag not in ["input", "select", "textarea"]:
                 if attrs:
                     result.append(f"{sel} [{attrs}]")
@@ -102,7 +101,6 @@ class HTMLSimplifier:
                 if input_type in ["hidden", "file"]:
                     return
 
-                text = ""
                 if attrs:
                     result.append(f"{sel} [{attrs}]")
                 else:
@@ -145,11 +143,9 @@ class HTMLSimplifier:
                 return
 
         # ---------------------------------------
-        # DOM‑ORDER WALK (including text inside forms/links)
+        # DOM‑ORDER WALK (safe for text nodes)
         # ---------------------------------------
         for el in soup.body.descendants if soup.body else soup.descendants:
-            if not hasattr(el, "name"):
-                continue
             process(el)
 
         return "\n".join(result)
