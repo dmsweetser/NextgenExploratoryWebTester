@@ -36,59 +36,85 @@ class HTMLSimplifier:
             return " > ".join(reversed(parts))
 
         # ---------------------------------------
+        # Convert attributes to a readable string
+        # ---------------------------------------
+        def attr_string(el):
+            attrs = []
+            for key, value in el.attrs.items():
+                # Normalize class lists
+                if key == "class":
+                    value = " ".join(value)
+                attrs.append(f"{key}='{value}'")
+            return " ".join(attrs) if attrs else ""
+
+        # ---------------------------------------
         # Process each element in DOM order
         # ---------------------------------------
         def process(el):
             tag = el.name
+            sel = full_selector(el)
+            attrs = attr_string(el)
 
-            # TEXT‑BEARING TAGS
-            if tag in ["h1","h2","h3","h4","h5","h6","p","span","li","strong","em","b","i"]:
+            # TEXT‑BEARING TAGS (including div)
+            if tag in [
+                "h1","h2","h3","h4","h5","h6",
+                "p","span","li","strong","em","b","i",
+                "div"
+            ]:
                 text = el.get_text(strip=True)
                 if text:
-                    result.append(f"{full_selector(el)}: '{text}'")
+                    if attrs:
+                        result.append(f"{sel} [{attrs}]: '{text}'")
+                    else:
+                        result.append(f"{sel}: '{text}'")
+                else:
+                    if attrs:
+                        result.append(f"{sel} [{attrs}]")
                 return
 
             # LINKS
             if tag == "a" and el.get("href"):
                 text = el.get_text(strip=True)
                 href = el.get("href")
-                if text:
-                    result.append(f"{full_selector(el)}: '{text}' ({href})")
+                if attrs:
+                    base = f"{sel} [{attrs}]"
                 else:
-                    result.append(f"{full_selector(el)} ({href})")
+                    base = sel
+
+                if text:
+                    result.append(f"{base}: '{text}' ({href})")
+                else:
+                    result.append(f"{base} ({href})")
                 return
 
-            # FORMS
-            if tag == "form":
-                result.append(full_selector(el))
+            # GENERIC ELEMENTS (including form, button, label, etc.)
+            # Inputs, selects, textareas get special handling below
+            if tag not in ["input", "select", "textarea"]:
+                if attrs:
+                    result.append(f"{sel} [{attrs}]")
+                else:
+                    result.append(sel)
                 return
 
-            # INPUTS
+            # INPUT
             if tag == "input":
                 input_type = el.get("type", "text")
                 if input_type in ["hidden", "file"]:
                     return
 
-                sel = full_selector(el)
-                name = el.get("name")
-                placeholder = el.get("placeholder")
-                value = el.get("value")
-
-                line = f"{sel} [type={input_type}]"
-                if name:
-                    line += f" [name={name}]"
-                if placeholder:
-                    line += f" placeholder='{placeholder}'"
-                if value:
-                    line += f" value='{value}'"
-
-                result.append(line)
+                text = ""
+                if attrs:
+                    result.append(f"{sel} [{attrs}]")
+                else:
+                    result.append(sel)
                 return
 
             # SELECT
             if tag == "select":
-                sel = full_selector(el)
-                result.append(sel)
+                if attrs:
+                    result.append(f"{sel} [{attrs}]")
+                else:
+                    result.append(sel)
 
                 options = el.find_all("option")
                 selected = None
@@ -98,43 +124,24 @@ class HTMLSimplifier:
                         break
 
                 if selected:
-                    result.append(f"{sel} > option: '{selected}'  <!-- {len(options)} total -->")
+                    result.append(
+                        f"{sel} > option: '{selected}'  <!-- {len(options)} total -->"
+                    )
                 return
 
             # TEXTAREA
             if tag == "textarea":
-                sel = full_selector(el)
                 text = el.get_text(strip=True)
-                placeholder = el.get("placeholder")
-
-                if placeholder:
-                    result.append(f"{sel} placeholder='{placeholder}'")
-                elif text:
-                    result.append(f"{sel}: '{text}'")
+                if attrs:
+                    if text:
+                        result.append(f"{sel} [{attrs}]: '{text}'")
+                    else:
+                        result.append(f"{sel} [{attrs}]")
                 else:
-                    result.append(sel)
-                return
-
-            # BUTTON
-            if tag == "button":
-                sel = full_selector(el)
-                text = el.get_text(strip=True)
-                btn_type = el.get("type", "button")
-
-                if text:
-                    result.append(f"{sel} [type={btn_type}]: '{text}'")
-                else:
-                    result.append(f"{sel} [type={btn_type}]")
-                return
-
-            # LABEL
-            if tag == "label":
-                sel = full_selector(el)
-                text = el.get_text(strip=True)
-                if text:
-                    result.append(f"{sel}: '{text}'")
-                else:
-                    result.append(sel)
+                    if text:
+                        result.append(f"{sel}: '{text}'")
+                    else:
+                        result.append(sel)
                 return
 
         # ---------------------------------------
