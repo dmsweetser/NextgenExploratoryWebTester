@@ -107,7 +107,7 @@
                     {% endif %}
                     {% if step['screenshot_data'] %}
                     <img src="data:image/png;base64,{{ step['screenshot_data'] }}" class="screenshot-thumb img-thumbnail"
-                        alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')">
+                        alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')" style="max-height: 300px;">
                     {% endif %}
                     <p class="text-muted"><small>Selector: <code>{{ step['element'] }}</code></small></p>
                 </div>
