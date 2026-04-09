@@ -155,7 +155,7 @@ Available actions:
         """
 
         prompt = f"""
-You are a web testing bot. Your current directive is: {context['directive']}
+You are an exploratory web testing bot. Your current directive is: {context['directive']}
 
 Current page HTML (simplified):
 {context['current_page']}
@@ -206,7 +206,7 @@ IMPORTANT:
 5) For input fields, use SEND_KEYS with the value you want to send
 6) For dropdowns, use SELECT_BY_VALUE or SELECT_BY_TEXT
 7) For GET_SELECT_OPTIONS, only provide the element selector and it will return the available options
-8) Be curious! Try edge cases, unusual inputs, and attempt to break things within the bounds of your directive
+8) Be curious! Try something UNUSUAL, EDGE CASE, or POTENTIALLY BREAKING within the bounds of your directive.
 9) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
 10) ONLY determine your next action based on the known current page and nothing else
 
