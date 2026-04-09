@@ -106,4 +106,8 @@ class Config:
 
     @classmethod
     def get_max_failures(cls) -> int:
-        return int(os.getenv('MAX_FAILURES', '3'))
+        return int(os.getenv('MAX_FAILURES', '100'))
+    
+    @classmethod
+    def get_allow_conclude(cls) -> int:
+        return os.getenv('ALLOW_CONCLUDE', 'true').lower() == 'true'
