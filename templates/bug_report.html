@@ -101,6 +101,9 @@
             <li>
                 <strong>{{ step['timestamp'] if step['timestamp'] and step['timestamp'] != '' else step['action'] }}</strong>
                 {% if step['element'] %}<br><small>Element: {{ step['element'] }}</small>{% endif %}
+                {% if step['friendly_description'] %}<br><small>Description: {{ step['friendly_description'] }}</small>{% endif %}
+                {% if step['reasoning'] %}<br><small>Reasoning: {{ step['reasoning'] }}</small>{% endif %}
+                {% if step['success'] is not none %}<br><small>Success: {% if step['success'] %}<span class="text-success">Yes</span>{% else %}<span class="text-danger">No</span>{% endif %}</small>{% endif %}
                 {% if step['screenshot_data'] %}
                 <br>
                 <img src="data:image/png;base64,{{ step['screenshot_data'] }}" class="screenshot" alt="Step screenshot" onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')">
