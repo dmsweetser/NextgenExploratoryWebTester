@@ -30,8 +30,6 @@ class BotThread(threading.Thread):
         self.default_wait = Config.get_default_wait()
         self.max_failures = Config.get_max_failures()
         self.failure_count = 0
-        self.max_failures = 3
-        self.curious_mode = True
         self.select_options_cache = {}
 
     def run(self):
@@ -98,12 +96,13 @@ class BotThread(threading.Thread):
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
 
                 # Check if directive is complete
-                try:
-                    if self.is_directive_complete():
-                        break
-                except Exception as e:
-                    self.logger.error(f"Bot {self.bot_id} - Error in completion check: {str(e)}")
-                    self.failure_count += 1
+                if Config.get_allow_conclude():
+                    try:
+                        if self.is_directive_complete():
+                            break
+                    except Exception as e:
+                        self.logger.error(f"Bot {self.bot_id} - Error in completion check: {str(e)}")
+                        self.failure_count += 1
 
         except Exception as e:
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
@@ -391,7 +390,7 @@ Current page HTML (simplified):
 
 Consider:
 1. Any error messages, exceptions, or malfunctions
-2. Logical blocking - elements that should be interactive but aren't
+2. Logical blocking - an inability to complete your directive based on steps taken and current state of the page
 3. Typos or incorrect text that indicates a problem
 4. Unexpected page states or behaviors
 5. Edge cases or unusual conditions that might indicate a bug
@@ -399,6 +398,7 @@ Consider:
 Avoid:
 1. Reporting a bug that is the same as an existing known bug
 2. Reporting a bug that is due to an error in the test app (such as a bad selector), and not in the target application
+3. Reporting a bug related to select options - they are omitted in the simplified page HTML on purpose, and provided on demand
 
 Respond ONLY with the following:
 
