@@ -14,6 +14,41 @@ class HTMLSimplifier:
         result = []
 
         # ---------------------------------------
+        # Check if element is visible to user
+        # ---------------------------------------
+        def is_visible(el):
+            if not hasattr(el, "name"):
+                return False
+
+            # Check for display: none
+            if el.has_attr("style") and "display: none" in el["style"]:
+                return False
+
+            # Check for visibility: hidden
+            if el.has_attr("style") and "visibility: hidden" in el["style"]:
+                return False
+
+            # Check for opacity: 0
+            if el.has_attr("style") and "opacity: 0" in el["style"]:
+                return False
+
+            # Check for hidden attribute
+            if el.has_attr("hidden"):
+                return False
+
+            # Check if parent is hidden
+            parent = el.parent
+            while parent:
+                if parent.name and (parent.has_attr("hidden") or
+                                   (parent.has_attr("style") and ("display: none" in parent["style"] or
+                                                                 "visibility: hidden" in parent["style"] or
+                                                                 "opacity: 0" in parent["style"]))):
+                    return False
+                parent = parent.parent
+
+            return True
+
+        # ---------------------------------------
         # Build a full selector including parents
         # ---------------------------------------
         def full_selector(el):
@@ -56,11 +91,27 @@ class HTMLSimplifier:
             return " ".join(attrs) if attrs else ""
 
         # ---------------------------------------
+        # Get immediate text (not nested text)
+        # ---------------------------------------
+        def immediate_text(el):
+            text = ""
+            for child in el.children:
+                if isinstance(child, NavigableString):
+                    text += child.strip()
+                elif hasattr(child, "name"):
+                    break
+            return text.strip()
+
+        # ---------------------------------------
         # Process each element in DOM order
         # ---------------------------------------
         def process(el):
             # Skip text nodes safely
             if isinstance(el, NavigableString):
+                return
+
+            # Skip if not visible
+            if not is_visible(el):
                 return
 
             tag = el.name
@@ -73,7 +124,7 @@ class HTMLSimplifier:
                 "p","span","li","strong","em","b","i",
                 "div"
             ]:
-                text = el.get_text(strip=True)
+                text = immediate_text(el)
                 if text:
                     if attrs:
                         result.append(f"{sel} [{attrs}]: '{text}'")
@@ -86,7 +137,7 @@ class HTMLSimplifier:
 
             # LINKS
             if tag == "a" and el.get("href"):
-                text = el.get_text(strip=True)
+                text = immediate_text(el)
                 href = el.get("href")
                 base = f"{sel} [{attrs}]" if attrs else sel
 
@@ -127,7 +178,7 @@ class HTMLSimplifier:
                 selected = None
                 for opt in options:
                     if opt.has_attr("selected"):
-                        selected = opt.get_text(strip=True)
+                        selected = immediate_text(opt)
                         break
 
                 if selected:
@@ -138,7 +189,7 @@ class HTMLSimplifier:
 
             # TEXTAREA
             if tag == "textarea":
-                text = el.get_text(strip=True)
+                text = immediate_text(el)
                 if attrs:
                     if text:
                         result.append(f"{sel} [{attrs}]: '{text}'")
@@ -157,4 +208,4 @@ class HTMLSimplifier:
         for el in soup.body.descendants if soup.body else soup.descendants:
             process(el)
 
-        return "\n".join(result)
+        return chr(10).join(result)

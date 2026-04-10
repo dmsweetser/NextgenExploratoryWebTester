@@ -41,24 +41,19 @@ class BotThread(threading.Thread):
 
             step_number = len(self.db.get_steps(self.bot_id)) + 1
 
-            while not self.stop_event.is_set():
+            try:
+                self.driver.get(self.start_url)
+                # Handle any unexpected alerts
                 try:
-                    self.driver.get(self.start_url)
-                    # Handle any unexpected alerts
-                    try:
-                        alert = self.driver.switch_to.alert
-                        alert.accept()
-                    except:
-                        pass
-                    time.sleep(2)
-                except Exception as e:
-                    self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
-                    self.failure_count += 1
-                    if self.failure_count >= self.max_failures:
-                        break
-                    time.sleep(5)
-                    continue
+                    alert = self.driver.switch_to.alert
+                    alert.accept()
+                except:
+                    pass
+                time.sleep(2)
+            except Exception as e:
+                self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
 
+            while not self.stop_event.is_set():
                 simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
                 current_url = self.driver.current_url
 
