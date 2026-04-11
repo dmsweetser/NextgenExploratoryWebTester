@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Building Linux executable for NEWT..."
+echo "Building Windows and Linux executables for NEWT..."
 echo ""
 
 # Check if pyinstaller is available
@@ -22,16 +22,16 @@ if [ -z "$VIRTUAL_ENV" ]; then
     fi
 fi
 
-# Build the executable
-echo "Building executable with PyInstaller..."
-pyinstaller --onefile --windowed --add-data "templates:templates" --add-data "static:static" --add-data "models:models" --add-data "data:data" app.py
+# Build Linux executable
+echo "Building Linux executable with PyInstaller..."
+pyinstaller --onefile --add-data "templates:templates" --add-data "static:static" --add-data "models:models" --add-data "data:data" app.py
 
 if [ $? -ne 0 ]; then
     echo "Error: PyInstaller build failed."
     exit 1
 fi
 
-# Move the executable to the project root
+# Move Linux executable to the project root
 if [ -f "dist/app" ]; then
     chmod +x "dist/app"
     mv "dist/app" "NEWT"
@@ -43,6 +43,40 @@ if [ -f "dist/app" ]; then
 else
     echo "Error: Executable not found in dist folder."
     exit 1
+fi
+
+# Build Windows executable (using Wine if available)
+echo "Building Windows executable..."
+if command -v wine &> /dev/null; then
+    echo "Wine found. Building Windows binary..."
+
+    # Create a batch file to run PyInstaller for Windows
+    cat > build_windows.bat << EOF
+@echo off
+pyinstaller --onefile --windowed --add-data "templates;templates" --add-data "static;static" --add-data "models;models" --add-data "data;data" --icon="static/images/newt_icon.ico" app.py
+EOF
+
+    # Run the batch file using Wine
+    wine build_windows.bat
+
+    if [ $? -eq 0 ]; then
+        # Check if the Windows executable was created
+        if [ -f "dist/app.exe" ]; then
+            mv "dist/app.exe" "NEWT-win.exe"
+            echo "Windows executable created: NEWT-win.exe"
+            echo ""
+            echo "To run NEWT on Windows, execute: NEWT-win.exe"
+        else
+            echo "Error: Windows executable not found in dist folder."
+        fi
+    else
+        echo "Error: Windows build failed."
+    fi
+
+    # Clean up the batch file
+    rm -f build_windows.bat
+else
+    echo "Wine not found. Skipping Windows build."
 fi
 
 # Clean up

@@ -24,8 +24,8 @@ if not defined VIRTUAL_ENV (
     )
 )
 
-REM Build the executable
-echo Building executable with PyInstaller...
+REM Build Windows executable
+echo Building Windows executable with PyInstaller...
 pyinstaller --onefile --windowed --add-data "templates;templates" --add-data "static;static" --add-data "models;models" --add-data "data;data" --icon="static/images/newt_icon.ico" app.py
 
 if %errorlevel% neq 0 (
@@ -33,7 +33,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Move the executable to the project root
+REM Move Windows executable to the project root
 if exist "dist\app.exe" (
     move "dist\app.exe" "NEWT.exe"
     echo Executable created: NEWT.exe

@@ -244,6 +244,8 @@ class HTMLSimplifier:
         # DOM‑ORDER WALK (safe for text nodes)
         # ---------------------------------------
         for el in soup.body.descendants if soup.body else soup.descendants:
+            if el.name == "option":
+                continue
             process(el)
 
         # Truncate if needed
