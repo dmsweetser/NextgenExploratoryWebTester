@@ -1,5 +1,7 @@
 from bs4 import BeautifulSoup, NavigableString
 
+from lib.config import Config
+
 class HTMLSimplifier:
     def simplify_html(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
@@ -203,9 +205,49 @@ class HTMLSimplifier:
                 return
 
         # ---------------------------------------
+        # Estimate token count and truncate if needed
+        # ---------------------------------------
+        def estimate_token_count(text):
+            """Simple approximation: 1 token ~ 4 characters"""
+            return len(text) / 4
+
+        def truncate_html(simplified_lines, max_tokens=8000):
+            """Truncate HTML representation to stay within token limit"""
+            current_count = estimate_token_count(chr(10).join(simplified_lines))
+
+            if current_count <= max_tokens:
+                return simplified_lines
+
+            # Truncate by removing less important elements
+            truncated = []
+            important_tags = ['input', 'button', 'form', 'select', 'textarea', 'a']
+
+            for line in simplified_lines:
+                # Keep important interactive elements
+                if any(tag in line for tag in important_tags):
+                    truncated.append(line)
+                # Keep short lines (likely headers, labels, etc.)
+                elif len(line) < 100:
+                    truncated.append(line)
+
+            # If still too long, truncate further
+            if estimate_token_count(chr(10).join(truncated)) > max_tokens:
+                # Keep only first 80% and add truncation notice
+                cutoff = int(len(truncated) * 0.8)
+                truncated = truncated[:cutoff]
+                truncated.append("# [TRUNCATED] HTML content reduced to fit token limit")
+                truncated.append("# Use GET_SELECT_OPTIONS to get detailed select element information")
+
+            return truncated
+
+        # ---------------------------------------
         # DOM‑ORDER WALK (safe for text nodes)
         # ---------------------------------------
         for el in soup.body.descendants if soup.body else soup.descendants:
             process(el)
 
-        return chr(10).join(result)
+        # Truncate if needed
+        max_prompt_tokens = Config.get_max_prompt_tokens()
+        simplified_lines = truncate_html(result, max_prompt_tokens)
+
+        return chr(10).join(simplified_lines)

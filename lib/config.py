@@ -111,3 +111,7 @@ class Config:
     @classmethod
     def get_allow_conclude(cls) -> bool:
         return os.getenv('ALLOW_CONCLUDE', 'true').lower() == 'true'
+
+    @classmethod
+    def get_max_prompt_tokens(cls) -> int:
+        return int(os.getenv('MAX_PROMPT_TOKENS', '131000'))

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+echo "Building Linux executable for NEWT..."
+echo ""
+
+# Check if pyinstaller is available
+if ! command -v pyinstaller &> /dev/null; then
+    echo "Error: pyinstaller is not installed."
+    echo "Please install pyinstaller first: pip install pyinstaller"
+    exit 1
+fi
+
+# Check if virtual environment is active
+if [ -z "$VIRTUAL_ENV" ]; then
+    echo "Warning: Virtual environment not detected."
+    echo "Trying to activate it..."
+    if [ -f "venv/bin/activate" ]; then
+        source venv/bin/activate
+    else
+        echo "Error: No virtual environment found."
+        exit 1
+    fi
+fi
+
+# Build the executable
+echo "Building executable with PyInstaller..."
+pyinstaller --onefile --windowed --add-data "templates:templates" --add-data "static:static" --add-data "models:models" --add-data "data:data" app.py
+
+if [ $? -ne 0 ]; then
+    echo "Error: PyInstaller build failed."
+    exit 1
+fi
+
+# Move the executable to the project root
+if [ -f "dist/app" ]; then
+    chmod +x "dist/app"
+    mv "dist/app" "NEWT"
+    echo "Executable created: NEWT"
+    echo ""
+    echo "To run NEWT, execute: ./NEWT"
+    echo ""
+    echo "To create a .env file, copy .env.example to .env and edit as needed."
+else
+    echo "Error: Executable not found in dist folder."
+    exit 1
+fi
+
+# Clean up
+rm -rf build
+rm -rf dist
+rm -f "*.spec"
+
+echo "Build complete!"
+exit 0
