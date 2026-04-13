@@ -36,6 +36,7 @@ pyinstaller \
 --onefile \
 --add-data "templates:templates" \
 --add-data "static:static" \
+--add-data "llama.cpp/build/bin:llama.cpp/build/bin" \
 --hidden-import selenium.webdriver.chrome.options \
 --hidden-import selenium.webdriver.chrome.webdriver \
 --hidden-import selenium.webdriver.common.by \
@@ -70,7 +71,7 @@ if command -v wine &> /dev/null; then
     # Create a temporary batch file
     cat > build_windows.sh << 'EOF'
 #!/bin/bash
-pyinstaller --onefile --windowed --add-data=templates:templates --add-data=static:static --hidden-import=selenium.webdriver.chrome.webdriver --hidden-import=selenium.webdriver.chrome.options --hidden-import=selenium.webdriver.common.by --hidden-import=selenium.webdriver.support.ui --hidden-import=selenium.webdriver.support.expected_conditions --distpath=dist/release/Windows app.py
+pyinstaller --onefile --windowed --add-data=templates:templates --add-data=static:static --add-data=llama.cpp/build/bin:llama.cpp/build/bin --hidden-import=selenium.webdriver.chrome.webdriver --hidden-import=selenium.webdriver.chrome.options --hidden-import=selenium.webdriver.common.by --hidden-import=selenium.webdriver.support.ui --hidden-import=selenium.webdriver.support.expected_conditions --distpath=dist/release/Windows app.py
 EOF
 
     chmod +x build_windows.sh
