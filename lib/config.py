@@ -13,6 +13,10 @@ class Config:
         return os.getenv('MODEL_PATH', 'models/llama-2-7b-chat.ggmlv3.q4_0.bin')
 
     @classmethod
+    def get_llama_binary_path(cls) -> str:
+        return os.getenv('LLAMA_BINARY_PATH', 'llama.cpp/build/bin/llama-completion')
+
+    @classmethod
     def get_model_context(cls) -> int:
         return int(os.getenv('MODEL_CONTEXT', '131072'))
 
@@ -103,6 +107,10 @@ class Config:
     @classmethod
     def get_default_wait(cls) -> int:
         return int(os.getenv('DEFAULT_WAIT', '10'))
+    
+    @classmethod
+    def get_port(cls) -> int:
+        return int(os.getenv('RUNNING_PORT', '6329'))
 
     @classmethod
     def get_max_failures(cls) -> int:
@@ -111,3 +119,7 @@ class Config:
     @classmethod
     def get_allow_conclude(cls) -> bool:
         return os.getenv('ALLOW_CONCLUDE', 'true').lower() == 'true'
+
+    @classmethod
+    def get_max_prompt_tokens(cls) -> int:
+        return int(os.getenv('MAX_PROMPT_TOKENS', '131000'))
