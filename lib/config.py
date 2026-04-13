@@ -13,6 +13,10 @@ class Config:
         return os.getenv('MODEL_PATH', 'models/llama-2-7b-chat.ggmlv3.q4_0.bin')
 
     @classmethod
+    def get_llama_binary_path(cls) -> str:
+        return os.getenv('LLAMA_BINARY_PATH', 'llama.cpp/build/bin/llama-completion')
+
+    @classmethod
     def get_model_context(cls) -> int:
         return int(os.getenv('MODEL_CONTEXT', '131072'))
 
