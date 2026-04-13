@@ -32,7 +32,16 @@ cp .env.example dist/release/Windows/.env.example
 
 # Build Linux executable
 echo "Building Linux executable with PyInstaller..."
-pyinstaller --onefile --add-data "templates:templates" --add-data "static:static" --distpath dist/release/Linux app.py
+pyinstaller \
+--onefile \
+--add-data "templates:templates" \
+--add-data "static:static" \
+--hidden-import selenium.webdriver.chrome.options \
+--hidden-import selenium.webdriver.chrome.webdriver \
+--hidden-import selenium.webdriver.common.by \
+--hidden-import selenium.webdriver.support.ui \
+--hidden-import selenium.webdriver.support.expected_conditions \
+--distpath dist/release/Linux app.py
 
 if [ $? -ne 0 ]; then
     echo "Error: PyInstaller build failed."
@@ -61,7 +70,7 @@ if command -v wine &> /dev/null; then
     # Create a temporary batch file
     cat > build_windows.sh << 'EOF'
 #!/bin/bash
-pyinstaller --onefile --windowed --add-data=templates:templates --add-data=static:static --distpath=dist/release/Windows app.py
+pyinstaller --onefile --windowed --add-data=templates:templates --add-data=static:static --hidden-import=selenium.webdriver.chrome.webdriver --hidden-import=selenium.webdriver.chrome.options --hidden-import=selenium.webdriver.common.by --hidden-import=selenium.webdriver.support.ui --hidden-import=selenium.webdriver.support.expected_conditions --distpath=dist/release/Windows app.py
 EOF
 
     chmod +x build_windows.sh
