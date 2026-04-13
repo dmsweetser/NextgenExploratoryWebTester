@@ -24,7 +24,7 @@ fi
 
 # Build Linux executable
 echo "Building Linux executable with PyInstaller..."
-pyinstaller --onefile --add-data "templates:templates" --add-data "static:static" --add-data "models:models" --add-data "data:data" app.py
+pyinstaller --onefile --add-data "templates:templates" --add-data "static:static" app.py
 
 if [ $? -ne 0 ]; then
     echo "Error: PyInstaller build failed."
@@ -53,7 +53,7 @@ if command -v wine &> /dev/null; then
     # Create a batch file to run PyInstaller for Windows
     cat > build_windows.bat << EOF
 @echo off
-pyinstaller --onefile --windowed --add-data "templates;templates" --add-data "static;static" --add-data "models;models" --add-data "data;data" --icon="static/images/newt_icon.ico" app.py
+pyinstaller --onefile --windowed --add-data "templates;templates" --add-data "static;static" app.py
 EOF
 
     # Run the batch file using Wine
