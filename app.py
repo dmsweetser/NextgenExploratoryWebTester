@@ -232,4 +232,4 @@ def test_website():
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
-    app.run(host='0.0.0.0', port=5000, debug=Config.get_debug())
+    app.run(host='127.0.0.1', port=Config.get_port(), debug=Config.get_debug())

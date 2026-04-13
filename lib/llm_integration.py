@@ -29,7 +29,7 @@ class LocalLlama:
             raise ValueError("MODEL_PATH not configured")
 
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        llama_binary = os.path.join(BASE_DIR, "..", "llama.cpp", "build", "bin", "llama-completion")
+        llama_binary = os.path.join(BASE_DIR, "..", Config.get_llama_binary_path())
 
         if not os.path.isfile(llama_binary):
             # Try alternative binary locations

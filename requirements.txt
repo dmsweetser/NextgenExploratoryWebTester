@@ -10,3 +10,4 @@ psutil
 werkzeug
 six
 zipfile36
+pyinstaller
