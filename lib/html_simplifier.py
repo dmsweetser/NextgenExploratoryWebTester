@@ -176,7 +176,8 @@ class HTMLSimplifier:
         line += "\n"
         line_length = len(line)
         if self.current_token_count + line_length > self.max_prompt_tokens:
-            self.result.append("# [TRUNCATED] HTML content reduced to fit token limit")
+            if "# [TRUNCATED BY NEWT] HTML content reduced to fit token limit" not in self.result:
+                self.result.append("# [TRUNCATED BY NEWT] HTML content reduced to fit token limit")
             return False
         self.result.append(line)
         self.current_token_count += line_length
