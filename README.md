@@ -63,7 +63,7 @@ NEWT (Next-gen Exploratory Web Tester) is an advanced automated web testing syst
    (Windows: `run.bat`)
 
 2. **Access the web interface:**
-   Open your browser to `http://localhost:5000`
+   Open your browser to `http://localhost:6329`
 
 3. **Create a new NEWT bot:**
    - Provide a name for your test
