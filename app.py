@@ -204,12 +204,12 @@ def remove_bot(bot_id):
 def run_self_test():
     bot_id = db.create_bot(
         name='NEWT Self-Test Bot',
-        start_url='http://localhost:5000/test-website',
+        start_url='http://localhost:' + str(Config.get_port()) + '/test-website',
         directive='Test this dummy website and find any bugs using NEWT'
     )
     bot_thread = BotThread(
         bot_id=bot_id,
-        start_url='http://localhost:5000/test-website',
+        start_url='http://localhost:' + str(Config.get_port()) + '/test-website',
         directive='Test this dummy website and find any bugs using NEWT',
         db=db,
         bot_manager=bot_manager,
