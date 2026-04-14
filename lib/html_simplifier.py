@@ -37,14 +37,28 @@ class HTMLSimplifier:
                 parent = parent.parent
             return True
 
-        # --- Short selector ---
+        # --- Direct text only ---
+        def direct_text(el):
+            return "".join(
+                child.strip()
+                for child in el.children
+                if isinstance(child, NavigableString)
+            )
+
+        # --- Short selector (now includes tag + ID) ---
         def short_selector(el):
             if el.name == "[document]":
                 return "[document]"
+
+            tag = el.name
+
+            # ID takes priority but keeps tag name
             if el.has_attr("id"):
-                return f"#{el['id']}"
+                return f"{tag}#{el['id']}"
+
+            # Otherwise use tag + classes
             classes = "".join(f".{c}" for c in el.get("class", []) if c)
-            return f"{el.name}{classes}"
+            return f"{tag}{classes}"
 
         # --- Relevant attributes ---
         def relevant_attrs(el):
@@ -93,10 +107,15 @@ class HTMLSimplifier:
 
             sel = short_selector(el)
             attrs = relevant_attrs(el)
+            text = direct_text(el)
 
-            # Text-bearing tags
-            if el.name in ["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "li", "strong", "em", "b", "i", "div"]:
-                text = el.get_text(strip=True)
+            # Skip empty containers with no direct text and no attributes
+            if el.name in ["div", "span", "li"] and not attrs and not text:
+                return
+
+            # Text-bearing tags (direct text only)
+            if el.name in ["h1", "h2", "h3", "h4", "h5", "h6",
+                           "p", "span", "li", "strong", "em", "b", "i", "div"]:
                 if text:
                     line = f"{sel}: '{text}'"
                 elif attrs:
@@ -108,7 +127,6 @@ class HTMLSimplifier:
 
             # Links
             if el.name == "a" and el.get("href"):
-                text = el.get_text(strip=True)
                 if text:
                     line = f"{sel} {attrs}: '{text}'"
                 else:
@@ -118,7 +136,6 @@ class HTMLSimplifier:
 
             # Buttons
             if el.name == "button":
-                text = el.get_text(strip=True)
                 if text:
                     line = f"{sel} {attrs}: '{text}'"
                 else:
@@ -138,10 +155,9 @@ class HTMLSimplifier:
                 self._add_line(line)
                 return
 
-            # Generic elements (e.g., forms, divs)
+            # Generic fallback
             if attrs:
-                line = f"{sel} {attrs}"
-                self._add_line(line)
+                self._add_line(f"{sel} {attrs}")
             else:
                 self._add_line(sel)
 
