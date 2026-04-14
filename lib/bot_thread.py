@@ -54,7 +54,7 @@ class BotThread(threading.Thread):
                 self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
 
             while not self.stop_event.is_set():
-                simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+                simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
                 current_url = self.driver.current_url
 
                 # Check domain to prevent cross-domain navigation
@@ -93,7 +93,7 @@ class BotThread(threading.Thread):
                     self.failure_count += 1
 
                 # Update simplified HTML
-                simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+                simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
 
                 # Check if directive is complete
                 if Config.get_allow_conclude():
@@ -108,6 +108,19 @@ class BotThread(threading.Thread):
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
         finally:
             self.cleanup()
+
+    def get_visible_html(self, driver):
+        elements = driver.find_elements(By.XPATH, "//*")
+        visible_html = []
+
+        for el in elements:
+            try:
+                if el.is_displayed():
+                    visible_html.append(el.get_attribute("outerHTML"))
+            except Exception:
+                pass  # stale or detached elements
+
+        return "\n".join(visible_html)
 
     def stop(self):
         self.stop_event.set()
@@ -376,7 +389,7 @@ THAT'S AN ORDER, SOLDIER!
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
-        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+        simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
         prompt = f"""
 Analyze the following page content and determine if there's a new bug based on the previous action.
 
@@ -404,6 +417,7 @@ Avoid:
 1. Reporting a bug that is the same as an existing known bug
 2. Reporting a bug that is due to an error in the test app (such as a bad selector), and not in the target application
 3. Reporting a bug related to select options - they are omitted in the simplified page HTML on purpose, and provided on demand
+4. Reporting a bug that is highly technical - focus on the experience of the end user instead of solely technical dynamics
 
 Respond ONLY with the following:
 
@@ -415,7 +429,7 @@ True or False
 High, Medium or Low
 [newt_severity_end]
 [newt_description_start]
-Detailed explanation of why this is a bug
+End user-friendly explanation of why this is a bug, along with a list of end user-friendly steps to reproduce the bug
 [newt_description_end]
 [newt_recommendation_start]
 How to fix or work around this bug
@@ -467,7 +481,7 @@ How to fix or work around this bug
             return None
 
     def is_directive_complete(self):
-        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+        simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
         prompt = f"""
 Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
