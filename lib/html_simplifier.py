@@ -10,16 +10,14 @@ class HTMLSimplifier:
     def simplify_html(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
 
-        # Remove noise tags entirely
+        # Remove noise tags
         for tag in soup([
             "script", "style", "noscript", "meta", "link",
             "svg", "canvas", "img", "iframe", "object", "embed"
         ]):
             tag.decompose()
 
-        # ---------------------------------------
-        # Check if element is visible to user
-        # ---------------------------------------
+        # --- Visibility check ---
         def is_visible(el):
             if not hasattr(el, "name"):
                 return False
@@ -39,155 +37,115 @@ class HTMLSimplifier:
                 parent = parent.parent
             return True
 
-        # ---------------------------------------
-        # Build a full selector including parents
-        # ---------------------------------------
-        def full_selector(el):
-            """Returns the shortest useful selector for the element."""
+        # --- Short selector ---
+        def short_selector(el):
             if el.name == "[document]":
                 return "[document]"
             if el.has_attr("id"):
                 return f"#{el['id']}"
-            if el.name == "body":
-                return "body"
             classes = "".join(f".{c}" for c in el.get("class", []) if c)
             return f"{el.name}{classes}"
 
-        # ---------------------------------------
-        # Convert attributes to a readable string - only include relevant attributes
-        # ---------------------------------------
-        def attr_string(el):
-            """Returns only the most relevant attributes for interaction."""
-            relevant = []
-            if el.name == "a" and el.get("href"):
-                relevant.append(f"[href='{el['href']}']")
-            if el.name == "input" and el.get("type") != "hidden":
-                relevant.append(f"[type='{el.get('type', 'text')}']")
-            if el.name in ["button", "input", "select", "textarea"] and el.get("name"):
-                relevant.append(f"[name='{el['name']}']")
+        # --- Relevant attributes ---
+        def relevant_attrs(el):
+            attrs = []
+            # Inputs
+            if el.name == "input":
+                attrs.append(f"[type='{el.get('type', 'text')}']")
+                if el.get("placeholder"):
+                    attrs.append(f"[placeholder='{el['placeholder']}']")
+            # Buttons and links
+            elif el.name in ["button", "a"]:
+                if el.name == "button" and el.get("type"):
+                    attrs.append(f"[type='{el['type']}']")
+                if el.name == "a" and el.get("href"):
+                    attrs.append(f"[href='{el['href']}']")
+            # Selects
+            elif el.name == "select" and el.get("id"):
+                selected = el.find("option", selected=True)
+                if selected:
+                    return f" > option: '{selected.get_text(strip=True)}'"
+            # Labels and data attributes
             if el.get("data-label"):
-                relevant.append(f"[data-label='{el['data-label']}']")
-            return " ".join(relevant)
+                attrs.append(f"[data-label='{el['data-label']}']")
+            if el.get("data-bs-toggle"):
+                attrs.append(f"[data-bs-toggle='{el['data-bs-toggle']}']")
+            return " ".join(attrs) if attrs else ""
 
-        # ---------------------------------------
-        # Get immediate text (not nested text)
-        # ---------------------------------------
-        def immediate_text(el):
-            text = ""
-            for child in el.children:
-                if isinstance(child, NavigableString):
-                    text += child.strip()
-                elif hasattr(child, "name"):
-                    break
-            return text.strip()
-
-        # ---------------------------------------
-        # Consolidate labels and inputs
-        # ---------------------------------------
-        def consolidate_label_input(el):
+        # --- Label consolidation ---
+        def consolidate_label(el):
             if el.name == "label" and el.get("for"):
                 input_id = el["for"]
                 input_tag = soup.find(attrs={"id": input_id})
                 if input_tag and is_visible(input_tag):
-                    label_text = immediate_text(el)
+                    label_text = el.get_text(strip=True)
                     if label_text:
                         input_tag["data-label"] = label_text
                     return True
             return False
 
-        # ---------------------------------------
-        # Process each element in DOM order
-        # ---------------------------------------
+        # --- Process element ---
         def process(el):
-            # Skip text nodes and invisible elements
             if isinstance(el, NavigableString) or not is_visible(el):
                 return
-
-            # Consolidate label and input
-            if consolidate_label_input(el):
+            if consolidate_label(el):
                 return
 
-            tag = el.name
-            sel = full_selector(el)
-            attrs = attr_string(el)
+            sel = short_selector(el)
+            attrs = relevant_attrs(el)
 
-            # TEXT‑BEARING TAGS
-            if tag in ["h1","h2","h3","h4","h5","h6","p","span","li","strong","em","b","i","div"]:
-                text = immediate_text(el)
+            # Text-bearing tags
+            if el.name in ["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "li", "strong", "em", "b", "i", "div"]:
+                text = el.get_text(strip=True)
                 if text:
-                    self._add_line(f"{sel}: '{text}'", attrs)
+                    line = f"{sel}: '{text}'"
                 elif attrs:
-                    self._add_line(sel, attrs)
+                    line = f"{sel} {attrs}"
+                else:
+                    line = sel
+                self._add_line(line)
                 return
 
-            # LINKS
-            if tag == "a" and el.get("href"):
-                text = immediate_text(el)
-                href = el["href"]
-                base = f"{sel} [{attrs}]" if attrs else sel
+            # Links
+            if el.name == "a" and el.get("href"):
+                text = el.get_text(strip=True)
                 if text:
-                    self._add_line(f"{base}: '{text}' ({href})")
+                    line = f"{sel} {attrs}: '{text}'"
                 else:
-                    self._add_line(f"{base} ({href})")
+                    line = f"{sel} {attrs}"
+                self._add_line(line)
                 return
 
-            # GENERIC ELEMENTS
-            if tag not in ["input", "select", "textarea"]:
-                if attrs:
-                    self._add_line(f"{sel} [{attrs}]")
+            # Buttons
+            if el.name == "button":
+                text = el.get_text(strip=True)
+                if text:
+                    line = f"{sel} {attrs}: '{text}'"
                 else:
-                    self._add_line(sel)
+                    line = f"{sel} {attrs}"
+                self._add_line(line)
                 return
 
-            # INPUT
-            if tag == "input":
-                input_type = el.get("type", "text")
-                if input_type in ["hidden", "file"]:
-                    return
-                if "data-label" in el.attrs:
-                    attrs = attr_string(el).replace("data-label", "")
-                    self._add_line(f"{sel} [{attrs}]: '{el['data-label']}'")
-                else:
-                    if attrs:
-                        self._add_line(f"{sel} [{attrs}]")
-                    else:
-                        self._add_line(sel)
+            # Inputs
+            if el.name == "input":
+                line = f"{sel} {attrs}"
+                self._add_line(line)
                 return
 
-            # SELECT
-            if tag == "select":
-                if attrs:
-                    self._add_line(f"{sel} [{attrs}]")
-                else:
-                    self._add_line(sel)
-                options = el.find_all("option")
-                selected = next((opt for opt in options if opt.has_attr("selected")), None)
-                if selected:
-                    self._add_line(f"{sel} > option: '{immediate_text(selected)}'  <!-- {len(options)} total -->")
+            # Selects
+            if el.name == "select":
+                line = f"{sel} {attrs}"
+                self._add_line(line)
                 return
 
-            # TEXTAREA
-            if tag == "textarea":
-                text = immediate_text(el)
-                if "data-label" in el.attrs:
-                    attrs = attr_string(el).replace("data-label", "")
-                    self._add_line(f"{sel} [{attrs}]: '{el['data-label']}': '{text}'")
-                else:
-                    if text:
-                        if attrs:
-                            self._add_line(f"{sel} [{attrs}]: '{text}'")
-                        else:
-                            self._add_line(f"{sel}: '{text}'")
-                    else:
-                        if attrs:
-                            self._add_line(f"{sel} [{attrs}]")
-                        else:
-                            self._add_line(sel)
-                return
+            # Generic elements (e.g., forms, divs)
+            if attrs:
+                line = f"{sel} {attrs}"
+                self._add_line(line)
+            else:
+                self._add_line(sel)
 
-        # ---------------------------------------
-        # DOM‑ORDER WALK
-        # ---------------------------------------
+        # --- Process DOM ---
         for el in soup.body.descendants if soup.body else soup.descendants:
             if el.name == "option":
                 continue
@@ -196,12 +154,9 @@ class HTMLSimplifier:
                 break
 
         return "".join(self.result)
-    
-    # ---------------------------------------
-    # Helper to add a line and check token count
-    # ---------------------------------------
-    def _add_line(self, selector_part, attrs_part=""):
-        line = f"{selector_part} [{attrs_part}]" if attrs_part else selector_part
+
+    # --- Add line with token check ---
+    def _add_line(self, line):
         line += "\n"
         line_length = len(line)
         if self.current_token_count + line_length > self.max_prompt_tokens:
