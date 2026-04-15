@@ -9,6 +9,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from lib.config import Config
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup, Tag
+import uuid
 from lib.llm_integration import extract_line_based_content
 
 class BotThread(threading.Thread):
@@ -110,47 +113,101 @@ class BotThread(threading.Thread):
             self.cleanup()
 
     def get_visible_html(self, driver):
-        elements = driver.find_elements(By.XPATH, "//*")
-        visible_html = []
+        # JS visibility logic
+        js_visibility_check = """
+            const el = arguments[0];
+            if (!el) return false;
 
+            let current = el;
+            while (current) {
+                const style = window.getComputedStyle(current);
+                if (style.display === 'none' ||
+                    style.visibility === 'hidden' ||
+                    style.opacity === '0') {
+                    return false;
+                }
+                current = current.parentElement;
+            }
+
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return false;
+
+            const inViewport =
+                rect.bottom > 0 &&
+                rect.right > 0 &&
+                rect.top < window.innerHeight &&
+                rect.left < window.innerWidth;
+
+            return inViewport;
+        """
+
+        # STEP 1 — Assign unique IDs to every element
+        elements = driver.find_elements(By.XPATH, "//*")
         for el in elements:
             try:
-                # Use JS to compute actual visibility
-                is_visible = driver.execute_script("""
-                    const el = arguments[0];
-                    if (!el) return false;
-
-                    // Walk up through ancestors
-                    let current = el;
-                    while (current) {
-                        const style = window.getComputedStyle(current);
-
-                        if (style.display === 'none' ||
-                            style.visibility === 'hidden' ||
-                            style.opacity === '0') {
-                            return false;
-                        }
-
-                        current = current.parentElement;
-                    }
-
-                    // Check bounding box (no size = not visible)
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0) {
-                        return false;
-                    }
-
-                    return true;
-                """, el)
-
-                if is_visible:
-                    visible_html.append(el.get_attribute("outerHTML"))
-
+                uid = "visid_" + uuid.uuid4().hex
+                driver.execute_script("arguments[0].setAttribute('data-vis-id', arguments[1]);", el, uid)
             except Exception:
-                # Ignore stale or detached elements
                 pass
 
-        return chr(10).join(visible_html)
+        # STEP 2 — Re-read the DOM with IDs included
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        # STEP 3 — Build visibility map keyed by data-vis-id
+        visibility = {}
+        for el in elements:
+            try:
+                uid = el.get_attribute("data-vis-id")
+                if not uid:
+                    continue
+                visible = driver.execute_script(js_visibility_check, el)
+                visibility[uid] = visible
+            except Exception:
+                pass
+
+        # STEP 4 — Recursively filter DOM
+        def filter_node(node):
+            if isinstance(node, Tag):
+                uid = node.get("data-vis-id")
+
+                # If tag has an ID and is invisible → drop it
+                if uid and not visibility.get(uid, False):
+                    return None
+
+                # Clone tag
+                new_tag = soup.new_tag(node.name, **{
+                    k: v for k, v in node.attrs.items()
+                    if k != "data-vis-id"
+                })
+
+                # Recurse into children
+                for child in node.children:
+                    filtered = filter_node(child)
+                    if filtered:
+                        new_tag.append(filtered)
+
+                return new_tag
+
+            # Keep text nodes
+            if isinstance(node, str) and node.strip():
+                return node
+
+            return None
+
+        # STEP 5 — Build final HTML document
+        new_html = soup.new_tag("html")
+        new_body = soup.new_tag("body")
+
+        body = soup.body
+        if body:
+            for child in body.children:
+                filtered = filter_node(child)
+                if filtered:
+                    new_body.append(filtered)
+
+        new_html.append(new_body)
+
+        return "<!DOCTYPE html>\n" + str(new_html)
 
     def stop(self):
         self.stop_event.set()
@@ -170,7 +227,7 @@ class BotThread(threading.Thread):
         options.add_argument('--disable-web-security')
         options.add_argument('--disable-features=VizDisplayCompositor')
         self.driver = webdriver.Chrome(options=options)
-        self.driver.set_window_size(1920, 1080)
+        self.driver.set_window_size(1920, 10000)
         self.driver.implicitly_wait(10)
 
     def get_next_action(self, context):
