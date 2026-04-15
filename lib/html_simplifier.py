@@ -8,6 +8,10 @@ class HTMLSimplifier:
         self.result = []
 
     def simplify_html(self, html: str) -> str:
+        self.max_prompt_tokens = Config.get_max_prompt_tokens()
+        self.current_token_count = 0
+        self.result = []
+
         soup = BeautifulSoup(html, "html.parser")
 
         # Remove noise tags (even if visible)

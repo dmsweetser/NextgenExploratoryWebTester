@@ -530,6 +530,7 @@ Avoid:
 2. Reporting a bug that is due to an error in the test app (such as a bad selector), and not in the target application
 3. Reporting a bug related to select options - they are omitted in the simplified page HTML on purpose, and provided on demand
 4. Reporting a bug that is highly technical - focus on the experience of the end user instead of solely technical dynamics
+5. Reporting a bug based on a single failed step - a bug should only be logged after mitigating steps confirm its existence
 
 Respond ONLY with the following:
 
