@@ -143,6 +143,7 @@ class BotThread(threading.Thread):
 
         # STEP 1 — Assign unique IDs to every element
         elements = driver.find_elements(By.XPATH, "//*")
+        element_ids = {}
         for el in elements:
             try:
                 uid = "visid_" + uuid.uuid4().hex
@@ -150,6 +151,7 @@ class BotThread(threading.Thread):
                     "arguments[0].setAttribute('data-vis-id', arguments[1]);",
                     el, uid
                 )
+                element_ids[el] = uid
             except Exception:
                 pass
 
@@ -158,20 +160,24 @@ class BotThread(threading.Thread):
 
         # STEP 3 — Build visibility map keyed by data-vis-id
         visibility = {}
-        for el in elements:
+        for el, uid in element_ids.items():
             try:
-                uid = el.get_attribute("data-vis-id")
-                if not uid:
-                    continue
                 visible = driver.execute_script(js_visibility_check, el)
                 visibility[uid] = visible
             except Exception:
                 pass
 
+        # Track processed elements to prevent duplicates
+        processed_elements = set()
+
         # STEP 4 — Recursively filter DOM
         def filter_node(node):
             if isinstance(node, Tag):
                 uid = node.get("data-vis-id")
+                if uid in processed_elements:
+                    return None
+                processed_elements.add(uid)
+
                 this_visible = visibility.get(uid, False) if uid else False
 
                 # SPECIAL CASE: keep <select> ONLY if the select itself is visible
