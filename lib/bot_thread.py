@@ -146,7 +146,10 @@ class BotThread(threading.Thread):
         for el in elements:
             try:
                 uid = "visid_" + uuid.uuid4().hex
-                driver.execute_script("arguments[0].setAttribute('data-vis-id', arguments[1]);", el, uid)
+                driver.execute_script(
+                    "arguments[0].setAttribute('data-vis-id', arguments[1]);",
+                    el, uid
+                )
             except Exception:
                 pass
 
@@ -169,9 +172,25 @@ class BotThread(threading.Thread):
         def filter_node(node):
             if isinstance(node, Tag):
                 uid = node.get("data-vis-id")
+                this_visible = visibility.get(uid, False) if uid else False
 
-                # If tag has an ID and is invisible → drop it
-                if uid and not visibility.get(uid, False):
+                # SPECIAL CASE: keep <select> ONLY if the select itself is visible
+                if node.name == "select":
+                    if this_visible:
+                        selected = node.find("option", selected=True)
+                        if selected:
+                            new_select = soup.new_tag("select", **{
+                                k: v for k, v in node.attrs.items()
+                                if k != "data-vis-id"
+                            })
+                            new_option = soup.new_tag("option", selected=True)
+                            new_option.string = selected.get_text(strip=True)
+                            new_select.append(new_option)
+                            return new_select
+                    return None  # invisible select → drop it
+
+                # Normal visibility rule: drop invisible nodes
+                if uid and not this_visible:
                     return None
 
                 # Clone tag
