@@ -115,12 +115,42 @@ class BotThread(threading.Thread):
 
         for el in elements:
             try:
-                if el.is_displayed():
-                    visible_html.append(el.get_attribute("outerHTML"))
-            except Exception:
-                pass  # stale or detached elements
+                # Use JS to compute actual visibility
+                is_visible = driver.execute_script("""
+                    const el = arguments[0];
+                    if (!el) return false;
 
-        return "\n".join(visible_html)
+                    // Walk up through ancestors
+                    let current = el;
+                    while (current) {
+                        const style = window.getComputedStyle(current);
+
+                        if (style.display === 'none' ||
+                            style.visibility === 'hidden' ||
+                            style.opacity === '0') {
+                            return false;
+                        }
+
+                        current = current.parentElement;
+                    }
+
+                    // Check bounding box (no size = not visible)
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) {
+                        return false;
+                    }
+
+                    return true;
+                """, el)
+
+                if is_visible:
+                    visible_html.append(el.get_attribute("outerHTML"))
+
+            except Exception:
+                # Ignore stale or detached elements
+                pass
+
+        return chr(10).join(visible_html)
 
     def stop(self):
         self.stop_event.set()
