@@ -8,34 +8,18 @@ class HTMLSimplifier:
         self.result = []
 
     def simplify_html(self, html: str) -> str:
+        self.max_prompt_tokens = Config.get_max_prompt_tokens()
+        self.current_token_count = 0
+        self.result = []
+
         soup = BeautifulSoup(html, "html.parser")
 
-        # Remove noise tags
+        # Remove noise tags (even if visible)
         for tag in soup([
             "script", "style", "noscript", "meta", "link",
             "svg", "canvas", "img", "iframe", "object", "embed"
         ]):
             tag.decompose()
-
-        # --- Visibility check ---
-        def is_visible(el):
-            if not hasattr(el, "name"):
-                return False
-            if el.has_attr("hidden"):
-                return False
-            if el.has_attr("style") and any(
-                s in el["style"] for s in ["display: none", "visibility: hidden", "opacity: 0"]
-            ):
-                return False
-            parent = el.parent
-            while parent:
-                if parent.name and (parent.has_attr("hidden") or
-                                   (parent.has_attr("style") and any(
-                                       s in parent["style"] for s in ["display: none", "visibility: hidden", "opacity: 0"]
-                                   ))):
-                    return False
-                parent = parent.parent
-            return True
 
         # --- Direct text only ---
         def direct_text(el):
@@ -45,45 +29,48 @@ class HTMLSimplifier:
                 if isinstance(child, NavigableString)
             )
 
-        # --- Short selector (now includes tag + ID) ---
+        # --- Short selector (tag + id + classes) ---
         def short_selector(el):
             if el.name == "[document]":
                 return "[document]"
 
             tag = el.name
 
-            # ID takes priority but keeps tag name
             if el.has_attr("id"):
                 return f"{tag}#{el['id']}"
 
-            # Otherwise use tag + classes
             classes = "".join(f".{c}" for c in el.get("class", []) if c)
             return f"{tag}{classes}"
 
         # --- Relevant attributes ---
         def relevant_attrs(el):
             attrs = []
+
             # Inputs
             if el.name == "input":
                 attrs.append(f"[type='{el.get('type', 'text')}']")
                 if el.get("placeholder"):
                     attrs.append(f"[placeholder='{el['placeholder']}']")
+
             # Buttons and links
             elif el.name in ["button", "a"]:
                 if el.name == "button" and el.get("type"):
                     attrs.append(f"[type='{el['type']}']")
                 if el.name == "a" and el.get("href"):
                     attrs.append(f"[href='{el['href']}']")
+
             # Selects
             elif el.name == "select" and el.get("id"):
                 selected = el.find("option", selected=True)
                 if selected:
                     return f" > option: '{selected.get_text(strip=True)}'"
-            # Labels and data attributes
+
+            # Data attributes
             if el.get("data-label"):
                 attrs.append(f"[data-label='{el['data-label']}']")
             if el.get("data-bs-toggle"):
                 attrs.append(f"[data-bs-toggle='{el['data-bs-toggle']}']")
+
             return " ".join(attrs) if attrs else ""
 
         # --- Label consolidation ---
@@ -91,7 +78,7 @@ class HTMLSimplifier:
             if el.name == "label" and el.get("for"):
                 input_id = el["for"]
                 input_tag = soup.find(attrs={"id": input_id})
-                if input_tag and is_visible(input_tag):
+                if input_tag:
                     label_text = el.get_text(strip=True)
                     if label_text:
                         input_tag["data-label"] = label_text
@@ -100,8 +87,10 @@ class HTMLSimplifier:
 
         # --- Process element ---
         def process(el):
-            if isinstance(el, NavigableString) or not is_visible(el):
+            if isinstance(el, NavigableString):
                 return
+
+            # Consolidate labels (still useful)
             if consolidate_label(el):
                 return
 
@@ -109,13 +98,15 @@ class HTMLSimplifier:
             attrs = relevant_attrs(el)
             text = direct_text(el)
 
-            # Skip empty containers with no direct text and no attributes
+            # Skip empty containers
             if el.name in ["div", "span", "li"] and not attrs and not text:
                 return
 
-            # Text-bearing tags (direct text only)
-            if el.name in ["h1", "h2", "h3", "h4", "h5", "h6",
-                           "p", "span", "li", "strong", "em", "b", "i", "div"]:
+            # Text-bearing tags
+            if el.name in [
+                "h1", "h2", "h3", "h4", "h5", "h6",
+                "p", "span", "li", "strong", "em", "b", "i", "div"
+            ]:
                 if text:
                     line = f"{sel}: '{text}'"
                 elif attrs:
@@ -126,7 +117,7 @@ class HTMLSimplifier:
                 return
 
             # Links
-            if el.name == "a" and el.get("href"):
+            if el.name == "a":
                 if text:
                     line = f"{sel} {attrs}: '{text}'"
                 else:
@@ -155,7 +146,7 @@ class HTMLSimplifier:
                 self._add_line(line)
                 return
 
-            # Generic fallback
+            # Fallback
             if attrs:
                 self._add_line(f"{sel} {attrs}")
             else:

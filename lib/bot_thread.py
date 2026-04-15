@@ -9,6 +9,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from lib.config import Config
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup, Tag
+import uuid
 from lib.llm_integration import extract_line_based_content
 
 class BotThread(threading.Thread):
@@ -54,7 +57,7 @@ class BotThread(threading.Thread):
                 self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
 
             while not self.stop_event.is_set():
-                simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+                simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
                 current_url = self.driver.current_url
 
                 # Check domain to prevent cross-domain navigation
@@ -93,7 +96,7 @@ class BotThread(threading.Thread):
                     self.failure_count += 1
 
                 # Update simplified HTML
-                simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+                simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
 
                 # Check if directive is complete
                 if Config.get_allow_conclude():
@@ -108,6 +111,128 @@ class BotThread(threading.Thread):
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
         finally:
             self.cleanup()
+
+    def get_visible_html(self, driver):
+        # JS visibility logic
+        js_visibility_check = """
+            const el = arguments[0];
+            if (!el) return false;
+
+            let current = el;
+            while (current) {
+                const style = window.getComputedStyle(current);
+                if (style.display === 'none' ||
+                    style.visibility === 'hidden' ||
+                    style.opacity === '0') {
+                    return false;
+                }
+                current = current.parentElement;
+            }
+
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return false;
+
+            const inViewport =
+                rect.bottom > 0 &&
+                rect.right > 0 &&
+                rect.top < window.innerHeight &&
+                rect.left < window.innerWidth;
+
+            return inViewport;
+        """
+
+        # STEP 1 — Assign unique IDs to every element
+        elements = driver.find_elements(By.XPATH, "//*")
+        element_ids = {}
+        for el in elements:
+            try:
+                uid = "visid_" + uuid.uuid4().hex
+                driver.execute_script(
+                    "arguments[0].setAttribute('data-vis-id', arguments[1]);",
+                    el, uid
+                )
+                element_ids[el] = uid
+            except Exception:
+                pass
+
+        # STEP 2 — Re-read the DOM with IDs included
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        # STEP 3 — Build visibility map keyed by data-vis-id
+        visibility = {}
+        for el, uid in element_ids.items():
+            try:
+                visible = driver.execute_script(js_visibility_check, el)
+                visibility[uid] = visible
+            except Exception:
+                pass
+
+        # Track processed elements to prevent duplicates
+        processed_elements = set()
+
+        # STEP 4 — Recursively filter DOM
+        def filter_node(node):
+            if isinstance(node, Tag):
+                uid = node.get("data-vis-id")
+                if uid in processed_elements:
+                    return None
+                processed_elements.add(uid)
+
+                this_visible = visibility.get(uid, False) if uid else False
+
+                # SPECIAL CASE: keep <select> ONLY if the select itself is visible
+                if node.name == "select":
+                    if this_visible:
+                        selected = node.find("option", selected=True)
+                        if selected:
+                            new_select = soup.new_tag("select", **{
+                                k: v for k, v in node.attrs.items()
+                                if k != "data-vis-id"
+                            })
+                            new_option = soup.new_tag("option", selected=True)
+                            new_option.string = selected.get_text(strip=True)
+                            new_select.append(new_option)
+                            return new_select
+                    return None  # invisible select → drop it
+
+                # Normal visibility rule: drop invisible nodes
+                if uid and not this_visible:
+                    return None
+
+                # Clone tag
+                new_tag = soup.new_tag(node.name, **{
+                    k: v for k, v in node.attrs.items()
+                    if k != "data-vis-id"
+                })
+
+                # Recurse into children
+                for child in node.children:
+                    filtered = filter_node(child)
+                    if filtered:
+                        new_tag.append(filtered)
+
+                return new_tag
+
+            # Keep text nodes
+            if isinstance(node, str) and node.strip():
+                return node
+
+            return None
+
+        # STEP 5 — Build final HTML document
+        new_html = soup.new_tag("html")
+        new_body = soup.new_tag("body")
+
+        body = soup.body
+        if body:
+            for child in body.children:
+                filtered = filter_node(child)
+                if filtered:
+                    new_body.append(filtered)
+
+        new_html.append(new_body)
+
+        return "<!DOCTYPE html>\n" + str(new_html)
 
     def stop(self):
         self.stop_event.set()
@@ -127,7 +252,7 @@ class BotThread(threading.Thread):
         options.add_argument('--disable-web-security')
         options.add_argument('--disable-features=VizDisplayCompositor')
         self.driver = webdriver.Chrome(options=options)
-        self.driver.set_window_size(1920, 1080)
+        self.driver.set_window_size(1920, 10000)
         self.driver.implicitly_wait(10)
 
     def get_next_action(self, context):
@@ -376,7 +501,7 @@ THAT'S AN ORDER, SOLDIER!
             return {'success': False, 'screenshot': full_screenshot_data}
 
     def detect_bug(self):
-        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+        simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
         prompt = f"""
 Analyze the following page content and determine if there's a new bug based on the previous action.
 
@@ -404,6 +529,8 @@ Avoid:
 1. Reporting a bug that is the same as an existing known bug
 2. Reporting a bug that is due to an error in the test app (such as a bad selector), and not in the target application
 3. Reporting a bug related to select options - they are omitted in the simplified page HTML on purpose, and provided on demand
+4. Reporting a bug that is highly technical - focus on the experience of the end user instead of solely technical dynamics
+5. Reporting a bug based on a single failed step - a bug should only be logged after mitigating steps confirm its existence
 
 Respond ONLY with the following:
 
@@ -415,7 +542,7 @@ True or False
 High, Medium or Low
 [newt_severity_end]
 [newt_description_start]
-Detailed explanation of why this is a bug
+End user-friendly explanation of why this is a bug, along with a list of end user-friendly steps to reproduce the bug
 [newt_description_end]
 [newt_recommendation_start]
 How to fix or work around this bug
@@ -467,7 +594,7 @@ How to fix or work around this bug
             return None
 
     def is_directive_complete(self):
-        simplified_html = self.html_simplifier.simplify_html(self.driver.page_source)
+        simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
         prompt = f"""
 Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
 
