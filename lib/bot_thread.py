@@ -55,57 +55,71 @@ class BotThread(threading.Thread):
                 time.sleep(2)
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
+                self.failure_count += 1
 
-            while not self.stop_event.is_set():
+            while not self.stop_event.is_set() and self.failure_count < self.max_failures:
                 simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
                 current_url = self.driver.current_url
-
-                # Check domain to prevent cross-domain navigation
-                if not self.is_same_domain(current_url, self.start_url):
-                    logging.warning(f"Bot {self.bot_id} attempted to navigate to different domain: {current_url}")
-                    break
-
-                # Build context for LLM with failure tracking
-                steps_taken = self.db.get_steps(self.bot_id)
-                recent_failures = sum(1 for step in steps_taken[-5:] if not step['success'])
-
-                context = {
-                    'directive': self.directive,
-                    'current_page': simplified_html,
-                    'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
-                    'steps_taken': steps_taken,
-                    'current_url': current_url,
-                    'select_options_cache': self.select_options_cache,
-                    'recent_failures': recent_failures,
-                    'failure_count': self.failure_count
-                }
-
-                action = self.get_next_action(context)
-
-                # Execute action
-                result = self.execute_action(action, step_number)
-                step_number += 1
-
-                # Check for bugs
                 try:
-                    analysis_result, analysis = self.detect_bug()
-                    if str(analysis_result).lower() == "true":
-                        self.report_bug(action, result, context, analysis)
-                except Exception as e:
-                    self.logger.error(f"Bot {self.bot_id} - Error in bug detection: {str(e)}")
-                    self.failure_count += 1
+                    # Check domain to prevent cross-domain navigation
+                    if not self.is_same_domain(current_url, self.start_url):
+                        logging.warning(f"Bot {self.bot_id} attempted to navigate to different domain: {current_url}")
+                        break
 
-                # Update simplified HTML
-                simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+                    # Build context for LLM with failure tracking
+                    steps_taken = self.db.get_steps(self.bot_id)
+                    recent_failures = sum(1 for step in steps_taken[-5:] if not step['success'])
 
-                # Check if directive is complete
-                if Config.get_allow_conclude():
-                    try:
-                        if self.is_directive_complete():
-                            break
-                    except Exception as e:
-                        self.logger.error(f"Bot {self.bot_id} - Error in completion check: {str(e)}")
+                    context = {
+                        'directive': self.directive,
+                        'current_page': simplified_html,
+                        'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
+                        'steps_taken': steps_taken,
+                        'current_url': current_url,
+                        'select_options_cache': self.select_options_cache,
+                        'recent_failures': recent_failures,
+                        'failure_count': self.failure_count
+                    }
+
+                    action = self.get_next_action(context)
+                    if not action:
                         self.failure_count += 1
+                        continue
+
+                    # Execute action
+                    result = self.execute_action(action, step_number)
+                    step_number += 1
+
+                    # Check for bugs
+                    try:
+                        analysis_result, analysis = self.detect_bug()
+                        if str(analysis_result).lower() == "true":
+                            self.report_bug(action, result, context, analysis)
+                    except Exception as e:
+                        self.logger.error(f"Bot {self.bot_id} - Error in bug detection: {str(e)}")
+                        self.failure_count += 1
+
+                    # Update simplified HTML
+                    simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+
+                    # Check if directive is complete
+                    if Config.get_allow_conclude():
+                        try:
+                            if self.is_directive_complete():
+                                break
+                        except Exception as e:
+                            self.logger.error(f"Bot {self.bot_id} - Error in completion check: {str(e)}")
+                            self.failure_count += 1
+
+                    # Reset failure count on successful action
+                    if result.get('success', False):
+                        self.failure_count = max(0, self.failure_count - 1)
+
+                except Exception as e:
+                    self.logger.error(f"Bot {self.bot_id} - Error in main loop: {str(e)}")
+                    self.failure_count += 1
+                    time.sleep(2)  # Brief pause to prevent rapid error loops
+
 
         except Exception as e:
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
@@ -113,126 +127,147 @@ class BotThread(threading.Thread):
             self.cleanup()
 
     def get_visible_html(self, driver):
-        # JS visibility logic
-        js_visibility_check = """
-            const el = arguments[0];
-            if (!el) return false;
+        try:
+            # JS visibility logic
+            js_visibility_check = """
+                const el = arguments[0];
+                if (!el) return false;
 
-            let current = el;
-            while (current) {
-                const style = window.getComputedStyle(current);
-                if (style.display === 'none' ||
-                    style.visibility === 'hidden' ||
-                    style.opacity === '0') {
-                    return false;
+                let current = el;
+                while (current) {
+                    const style = window.getComputedStyle(current);
+                    if (style.display === 'none' ||
+                        style.visibility === 'hidden' ||
+                        style.opacity === '0') {
+                        return false;
+                    }
+                    current = current.parentElement;
                 }
-                current = current.parentElement;
-            }
 
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return false;
+                const rect = el.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) return false;
 
-            const inViewport =
-                rect.bottom > 0 &&
-                rect.right > 0 &&
-                rect.top < window.innerHeight &&
-                rect.left < window.innerWidth;
+                const inViewport =
+                    rect.bottom > 0 &&
+                    rect.right > 0 &&
+                    rect.top < window.innerHeight &&
+                    rect.left < window.innerWidth;
 
-            return inViewport;
-        """
+                return inViewport;
+            """
 
-        # STEP 1 — Assign unique IDs to every element
-        elements = driver.find_elements(By.XPATH, "//*")
-        element_ids = {}
-        for el in elements:
+            # STEP 1 — Assign unique IDs to every element
+            elements = driver.find_elements(By.XPATH, "//*")
+            element_ids = {}
+            for el in elements:
+                try:
+                    uid = "visid_" + uuid.uuid4().hex
+                    driver.execute_script(
+                        "arguments[0].setAttribute('data-vis-id', arguments[1]);",
+                        el, uid
+                    )
+                    element_ids[el] = uid
+                except Exception:
+                    continue
+
+            # STEP 2 — Re-read the DOM with IDs included
             try:
-                uid = "visid_" + uuid.uuid4().hex
-                driver.execute_script(
-                    "arguments[0].setAttribute('data-vis-id', arguments[1]);",
-                    el, uid
-                )
-                element_ids[el] = uid
+                soup = BeautifulSoup(driver.page_source, "html.parser")
             except Exception:
-                pass
+                return "<html><body>Error processing page HTML</body></html>"
 
-        # STEP 2 — Re-read the DOM with IDs included
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+            # STEP 3 — Build visibility map keyed by data-vis-id
+            visibility = {}
+            for el, uid in element_ids.items():
+                try:
+                    visible = driver.execute_script(js_visibility_check, el)
+                    visibility[uid] = visible
+                except Exception:
+                    continue
 
-        # STEP 3 — Build visibility map keyed by data-vis-id
-        visibility = {}
-        for el, uid in element_ids.items():
-            try:
-                visible = driver.execute_script(js_visibility_check, el)
-                visibility[uid] = visible
-            except Exception:
-                pass
+            # Track processed elements to prevent duplicates
+            processed_elements = set()
 
-        # Track processed elements to prevent duplicates
-        processed_elements = set()
+            # STEP 4 — Recursively filter DOM with error handling
+            def filter_node(node):
+                try:
+                    if isinstance(node, Tag):
+                        uid = node.get("data-vis-id", "")
+                        if uid in processed_elements:
+                            return None
+                        processed_elements.add(uid)
 
-        # STEP 4 — Recursively filter DOM
-        def filter_node(node):
-            if isinstance(node, Tag):
-                uid = node.get("data-vis-id")
-                if uid in processed_elements:
-                    return None
-                processed_elements.add(uid)
+                        this_visible = visibility.get(uid, False) if uid else False
 
-                this_visible = visibility.get(uid, False) if uid else False
+                        # SPECIAL CASE: keep <select> ONLY if the select itself is visible
+                        if node.name == "select":
+                            if this_visible:
+                                try:
+                                    selected = node.find("option", selected=True)
+                                    new_select = soup.new_tag("select", **{
+                                        k: v for k, v in node.attrs.items()
+                                        if k != "data-vis-id"
+                                    })
+                                    if selected:
+                                        new_option = soup.new_tag("option", selected=True)
+                                        new_option.string = selected.get_text(strip=True)
+                                        new_select.append(new_option)
+                                    return new_select
+                                except Exception:
+                                    return None
+                            return None  # invisible select → drop it
 
-                # SPECIAL CASE: keep <select> ONLY if the select itself is visible
-                if node.name == "select":
-                    if this_visible:
-                        selected = node.find("option", selected=True)
-                        if selected:
-                            new_select = soup.new_tag("select", **{
+                        # Normal visibility rule: drop invisible nodes
+                        if uid and not this_visible:
+                            return None
+
+                        # Clone tag with error handling
+                        try:
+                            new_tag = soup.new_tag(node.name, **{
                                 k: v for k, v in node.attrs.items()
                                 if k != "data-vis-id"
                             })
-                            new_option = soup.new_tag("option", selected=True)
-                            new_option.string = selected.get_text(strip=True)
-                            new_select.append(new_option)
-                            return new_select
-                    return None  # invisible select → drop it
+                        except Exception:
+                            return None
 
-                # Normal visibility rule: drop invisible nodes
-                if uid and not this_visible:
+                        # Recurse into children with error handling
+                        for child in node.children:
+                            try:
+                                filtered = filter_node(child)
+                                if filtered:
+                                    new_tag.append(filtered)
+                            except Exception:
+                                continue
+
+                        return new_tag
+
+                    # Keep text nodes
+                    if isinstance(node, str) and node.strip():
+                        return node
+
+                    return None
+                except Exception:
                     return None
 
-                # Clone tag
-                new_tag = soup.new_tag(node.name, **{
-                    k: v for k, v in node.attrs.items()
-                    if k != "data-vis-id"
-                })
+            # STEP 5 — Build final HTML document with error handling
+            new_html = soup.new_tag("html")
+            new_body = soup.new_tag("body")
 
-                # Recurse into children
-                for child in node.children:
-                    filtered = filter_node(child)
-                    if filtered:
-                        new_tag.append(filtered)
+            if soup.body:
+                for child in soup.body.children:
+                    try:
+                        filtered = filter_node(child)
+                        if filtered:
+                            new_body.append(filtered)
+                    except Exception:
+                        continue
 
-                return new_tag
+            new_html.append(new_body)
 
-            # Keep text nodes
-            if isinstance(node, str) and node.strip():
-                return node
-
-            return None
-
-        # STEP 5 — Build final HTML document
-        new_html = soup.new_tag("html")
-        new_body = soup.new_tag("body")
-
-        body = soup.body
-        if body:
-            for child in body.children:
-                filtered = filter_node(child)
-                if filtered:
-                    new_body.append(filtered)
-
-        new_html.append(new_body)
-
-        return "<!DOCTYPE html>\n" + str(new_html)
+            return "<!DOCTYPE html>\n" + str(new_html)
+        except Exception as e:
+            self.logger.error(f"Error in get_visible_html: {str(e)}")
+            return "<html><body>Error processing page HTML</body></html>"
 
     def stop(self):
         self.stop_event.set()
@@ -376,12 +411,21 @@ THAT'S AN ORDER, SOLDIER!
     def execute_action(self, action, step_number):
         try:
             self.select_options_cache = {}
+            if not action:
+                return {'success': False, 'screenshot': None}
+
             action_type = action.get('action', '')
             element_selector_type = action.get('element_selector_type', 'CSS_SELECTOR')
             element_selector_value = action.get('element_selector_value', '')
             value = action.get('value', '')
             friendly_description = action.get('friendly_description', '')
             reasoning = action.get('reasoning', '')
+
+            # Validate required fields
+            if not action_type or not element_selector_type or not element_selector_value:
+                error_msg = f"Invalid action parameters: {action}"
+                self.logger.error(error_msg)
+                return {'success': False, 'screenshot': None}
 
             # Map selector type to Selenium By enum
             selector_map = {
@@ -401,104 +445,108 @@ THAT'S AN ORDER, SOLDIER!
             action_text = f"{action_type} on {element_selector_type}:{element_selector_value}"
 
             # Capture screenshot before action
+            full_screenshot_data = None
             try:
                 full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                full_screenshot_data = None
 
-            # Execute the action using Selenium
-            if action_type == 'CLICK':
-                try:
+            # Execute the action using Selenium with error handling
+            try:
+                if action_type == 'CLICK':
+                    try:
+                        element = WebDriverWait(self.driver, self.default_wait).until(
+                            EC.element_to_be_clickable((selector_type, selector_value))
+                        )
+                        self.highlight_element(element)
+                        element.click()
+                        self.unhighlight_element(element)
+                    except Exception as e:
+                        # Fallback: try to find by CSS selector if ID selector failed
+                        if selector_type == By.ID:
+                            try:
+                                self.logger.info(f"Bot {self.bot_id} - ID selector failed, trying CSS selector")
+                                element = WebDriverWait(self.driver, self.default_wait).until(
+                                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value))
+                                )
+                                self.highlight_element(element)
+                                element.click()
+                                self.unhighlight_element(element)
+                            except Exception as e2:
+                                raise Exception(f"Failed with both ID and CSS selectors: {str(e2)}")
+                        else:
+                            raise e
+                elif action_type == 'SEND_KEYS':
                     element = WebDriverWait(self.driver, self.default_wait).until(
-                        EC.element_to_be_clickable((selector_type, selector_value))
+                        EC.presence_of_element_located((selector_type, selector_value))
                     )
-                    self.highlight_element(element)
-                    element.click()
-                    self.unhighlight_element(element)
+                    element.clear()
+                    element.send_keys(value)
+                elif action_type == 'SELECT_BY_VALUE':
+                    select = Select(WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    ))
+                    select.select_by_value(value)
+                elif action_type == 'SELECT_BY_TEXT':
+                    select = Select(WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    ))
+                    select.select_by_visible_text(value)
+                elif action_type == 'GET_SELECT_OPTIONS':
+                    select = Select(WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    ))
+                    options = [opt.text for opt in select.options]
+                    self.select_options_cache[selector_value] = options
+                    action_text = f"Got select options for {selector_value}: {', '.join(options)}"
+                elif action_type == 'CLEAR':
+                    element = WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    )
+                    element.clear()
+                elif action_type == 'SUBMIT':
+                    element = WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    )
+                    element.submit()
+                elif action_type == 'WAIT':
+                    WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    )
+                else:
+                    raise Exception(f"Unknown action type: {action_type}")
+
+                # Wait for page to settle after action
+                time.sleep(self.default_wait)
+
+                # Capture screenshot after action
+                try:
+                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
                 except Exception as e:
-                    # Fallback: try to find by CSS selector if ID selector failed
-                    if selector_type == By.ID:
-                        try:
-                            self.logger.info(f"Bot {self.bot_id} - ID selector failed, trying CSS selector")
-                            element = WebDriverWait(self.driver, self.default_wait).until(
-                                EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value))
-                            )
-                            self.highlight_element(element)
-                            element.click()
-                            self.unhighlight_element(element)
-                        except Exception as e2:
-                            raise Exception(f"Failed with both ID and CSS selectors: {str(e2)}")
-                    else:
-                        raise e
-            elif action_type == 'SEND_KEYS':
-                element = WebDriverWait(self.driver, self.default_wait).until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                )
-                element.clear()
-                element.send_keys(value)
-            elif action_type == 'SELECT_BY_VALUE':
-                select = Select(WebDriverWait(self.driver, self.default_wait).until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                ))
-                select.select_by_value(value)
-            elif action_type == 'SELECT_BY_TEXT':
-                select = Select(WebDriverWait(self.driver, self.default_wait).until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                ))
-                select.select_by_visible_text(value)
-            elif action_type == 'GET_SELECT_OPTIONS':
-                select = Select(WebDriverWait(self.driver, self.default_wait).until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                ))
-                options = [opt.text for opt in select.options]
-                self.select_options_cache[selector_value] = options
-                action_text = f"Got select options for {selector_value}: {', '.join(options)}"
-            elif action_type == 'CLEAR':
-                element = WebDriverWait(self.driver, self.default_wait).until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                )
-                element.clear()
-            elif action_type == 'SUBMIT':
-                element = WebDriverWait(self.driver, self.default_wait).until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                )
-                element.submit()
-            elif action_type == 'WAIT':
-                WebDriverWait(self.driver, self.default_wait).until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                )
+                    self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot after action: {str(e)}")
 
-            # Wait for page to settle after action
-            time.sleep(self.default_wait)
+                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, friendly_description, reasoning)
+                self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
-            # Capture screenshot after action
-            try:
-                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                return {'success': True, 'screenshot': full_screenshot_data}
+
             except Exception as e:
-                self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
-                full_screenshot_data = None
+                error_msg = f"Failed to execute action {action_type} on {action['element']}: {str(e)}"
+                self.logger.error(error_msg, exc_info=True)
 
-            self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, friendly_description, reasoning)
-            self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
+                # Try to get a screenshot even if the action failed
+                try:
+                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                except Exception as screenshot_error:
+                    self.logger.error(f"Bot {self.bot_id} - Error capturing error screenshot: {str(screenshot_error)}")
 
-            result = {'success': True, 'screenshot': full_screenshot_data}
-            return result
+                self.db.add_step(self.bot_id, step_number, error_msg, action['element'], full_screenshot_data, friendly_description, reasoning, False)
+                return {'success': False, 'screenshot': full_screenshot_data}
 
         except Exception as e:
-            error_msg = f"Failed to execute action {action_type} on {action['element']}: {str(e)}"
+            error_msg = f"Unexpected error executing action: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
-            self.logger.debug(f"Bot {self.bot_id} - Full error details: {str(e)}", exc_info=True)
-
-            # Try to get a screenshot even if the action failed
-            try:
-                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
-            except Exception as screenshot_error:
-                self.logger.error(f"Bot {self.bot_id} - Error capturing error screenshot: {str(screenshot_error)}")
-                full_screenshot_data = None
-
-            self.db.add_step(self.bot_id, step_number, error_msg, action['element'], full_screenshot_data, friendly_description, reasoning, False)
-            return {'success': False, 'screenshot': full_screenshot_data}
+            return {'success': False, 'screenshot': None}
 
     def detect_bug(self):
         simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
@@ -681,21 +729,25 @@ If not complete, suggest the next area to test
 
     def highlight_element(self, element):
         """Highlight an element to make it visible in the screenshot"""
-
-        # Add highlighting style
-        self.driver.execute_script("""
-            arguments[0].style.border = '3px solid #ff0000';
-            arguments[0].style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
-        """, element)
+        try:
+            # Add highlighting style
+            self.driver.execute_script("""
+                arguments[0].style.border = '3px solid #ff0000';
+                arguments[0].style.boxShadow = '0 0 10px 5px rgba(255, 0, 0, 0.5)';
+            """, element)
+        except Exception as e:
+            self.logger.debug(f"Bot {self.bot_id} - Error highlighting element: {str(e)}")
 
     def unhighlight_element(self, element):
-        """Highlight an element to make it visible in the screenshot"""
-
-        # Add highlighting style
-        self.driver.execute_script("""
-            arguments[0].style.border = '';
-            arguments[0].style.boxShadow = '';
-        """, element)
+        """Remove highlighting from an element"""
+        try:
+            # Remove highlighting style
+            self.driver.execute_script("""
+                arguments[0].style.border = '';
+                arguments[0].style.boxShadow = '';
+            """, element)
+        except Exception as e:
+            self.logger.debug(f"Bot {self.bot_id} - Error unhighlighting element: {str(e)}")
 
     def get_step_text(self):
         steps = self.db.get_steps(self.bot_id)

@@ -64,11 +64,14 @@
             z-index: 1000;
             display: none;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            padding: 20px 0;
         }
         .screenshot-full img {
             max-width: 90%;
-            max-height: 90%;
+            max-height: none;
+            height: auto;
         }
         .screenshot-full-close {
             position: absolute;
@@ -119,18 +122,29 @@
     </div>
 
     <div class="screenshot-full" id="screenshotFull" onclick="closeFullImage()">
-        <div class="screenshot-full-close" onclick="closeFullImage()">×</div>
+        <div class="screenshot-full-close" onclick="closeFullImage(event)">×</div>
         <img src="" id="fullImage" alt="Full screenshot">
     </div>
 
     <script>
         function showFullImage(src) {
-            document.getElementById('fullImage').src = src;
-            document.getElementById('screenshotFull').style.display = 'flex';
+            const fullImage = document.getElementById('fullImage');
+            const screenshotFull = document.getElementById('screenshotFull');
+
+            if (fullImage && screenshotFull) {
+                fullImage.src = src;
+                screenshotFull.style.display = 'flex';
+            }
         }
 
-        function closeFullImage() {
-            document.getElementById('screenshotFull').style.display = 'none';
+        function closeFullImage(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const screenshotFull = document.getElementById('screenshotFull');
+            if (screenshotFull) {
+                screenshotFull.style.display = 'none';
+            }
         }
     </script>
 </body>
