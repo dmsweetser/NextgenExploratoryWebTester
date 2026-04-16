@@ -96,7 +96,7 @@ def bot(bot_id):
 def bugs():
     bugs = db.get_all_bugs()
     knowledge = db.get_all_knowledge()
-    return render_template('bugs.html', bugs=bugs, knowledge=knowledge)
+    return render_template('bugs.html', bugs=bugs, knowledge=knowledge, db=db)
 
 @app.route('/bug/<int:bug_id>/resolve', methods=['POST'])
 def resolve_bug(bug_id):
