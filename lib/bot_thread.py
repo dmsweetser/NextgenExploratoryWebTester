@@ -9,9 +9,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from lib.config import Config
-from selenium.webdriver.common.by import By
-from bs4 import BeautifulSoup, Tag
-import uuid
 from lib.llm_integration import extract_line_based_content
 import difflib
 
@@ -62,13 +59,13 @@ class BotThread(threading.Thread):
                 except:
                     pass
                 time.sleep(2)
-                self.previous_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+                self.previous_html = self.html_simplifier.simplify_html(self.html_simplifier.get_visible_html(self.driver))
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
                 self.failure_count += 1
 
             while not self.stop_event.is_set() and self.failure_count < self.max_failures:
-                current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+                current_html = self.html_simplifier.simplify_html(self.html_simplifier.get_visible_html(self.driver))
                 current_url = self.driver.current_url
                 try:
                     # Check domain to prevent cross-domain navigation
@@ -176,149 +173,6 @@ class BotThread(threading.Thread):
         else:
             return after_html
 
-    def get_visible_html(self, driver):
-        try:
-            # JS visibility logic
-            js_visibility_check = """
-                const el = arguments[0];
-                if (!el) return false;
-
-                let current = el;
-                while (current) {
-                    const style = window.getComputedStyle(current);
-                    if (style.display === 'none' ||
-                        style.visibility === 'hidden' ||
-                        style.opacity === '0') {
-                        return false;
-                    }
-                    current = current.parentElement;
-                }
-
-                const rect = el.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) return false;
-
-                const inViewport =
-                    rect.bottom > 0 &&
-                    rect.right > 0 &&
-                    rect.top < window.innerHeight &&
-                    rect.left < window.innerWidth;
-
-                return inViewport;
-            """
-
-            # STEP 1 — Assign unique IDs to every element
-            elements = driver.find_elements(By.XPATH, "//*")
-            element_ids = {}
-            for el in elements:
-                try:
-                    uid = "visid_" + uuid.uuid4().hex
-                    driver.execute_script(
-                        "arguments[0].setAttribute('data-vis-id', arguments[1]);",
-                        el, uid
-                    )
-                    element_ids[el] = uid
-                except Exception:
-                    continue
-
-            # STEP 2 — Re-read the DOM with IDs included
-            try:
-                soup = BeautifulSoup(driver.page_source, "html.parser")
-            except Exception:
-                return "<html><body>Error processing page HTML</body></html>"
-
-            # STEP 3 — Build visibility map keyed by data-vis-id
-            visibility = {}
-            for el, uid in element_ids.items():
-                try:
-                    visible = driver.execute_script(js_visibility_check, el)
-                    visibility[uid] = visible
-                except Exception:
-                    continue
-
-            # Track processed elements to prevent duplicates
-            processed_elements = set()
-
-            # STEP 4 — Recursively filter DOM with error handling
-            def filter_node(node):
-                try:
-                    if isinstance(node, Tag):
-                        uid = node.get("data-vis-id", "")
-                        if uid in processed_elements:
-                            return None
-                        processed_elements.add(uid)
-
-                        this_visible = visibility.get(uid, False) if uid else False
-
-                        # SPECIAL CASE: keep <select> ONLY if the select itself is visible
-                        if node.name == "select":
-                            if this_visible:
-                                try:
-                                    selected = node.find("option", selected=True)
-                                    new_select = soup.new_tag("select", **{
-                                        k: v for k, v in node.attrs.items()
-                                        if k != "data-vis-id"
-                                    })
-                                    if selected:
-                                        new_option = soup.new_tag("option", selected=True)
-                                        new_option.string = selected.get_text(strip=True)
-                                        new_select.append(new_option)
-                                    return new_select
-                                except Exception:
-                                    return None
-                            return None  # invisible select → drop it
-
-                        # Normal visibility rule: drop invisible nodes
-                        if uid and not this_visible:
-                            return None
-
-                        # Clone tag with error handling
-                        try:
-                            new_tag = soup.new_tag(node.name, **{
-                                k: v for k, v in node.attrs.items()
-                                if k != "data-vis-id"
-                            })
-                        except Exception:
-                            return None
-
-                        # Recurse into children with error handling
-                        for child in node.children:
-                            try:
-                                filtered = filter_node(child)
-                                if filtered:
-                                    new_tag.append(filtered)
-                            except Exception:
-                                continue
-
-                        return new_tag
-
-                    # Keep text nodes
-                    if isinstance(node, str) and node.strip():
-                        return node
-
-                    return None
-                except Exception:
-                    return None
-
-            # STEP 5 — Build final HTML document with error handling
-            new_html = soup.new_tag("html")
-            new_body = soup.new_tag("body")
-
-            if soup.body:
-                for child in soup.body.children:
-                    try:
-                        filtered = filter_node(child)
-                        if filtered:
-                            new_body.append(filtered)
-                    except Exception:
-                        continue
-
-            new_html.append(new_body)
-
-            return "<!DOCTYPE html>\n" + str(new_html)
-        except Exception as e:
-            self.logger.error(f"Error in get_visible_html: {str(e)}")
-            return "<html><body>Error processing page HTML</body></html>"
-
     def stop(self):
         self.stop_event.set()
 
@@ -417,24 +271,24 @@ IMPORTANT: If you have failed 3 or more times in a row, or if you see you are no
 What should your next action be? Respond ONLY with the following:
 
 ```
-[newt_action_start]
+~newt_action_start~
 ACTION_TYPE
-[newt_action_end]
-[newt_element_selector_type_start]
+~newt_action_end~
+~newt_element_selector_type_start~
 SELECTOR_TYPE (CSS_SELECTOR, ID, NAME, XPATH, CLASS_NAME, TAG_NAME, LINK_TEXT, PARTIAL_LINK_TEXT)
-[newt_element_selector_type_end]
-[newt_element_selector_value_start]
+~newt_element_selector_type_end~
+~newt_element_selector_value_start~
 SELECTOR_VALUE
-[newt_element_selector_value_end]
-[newt_value_start]
+~newt_element_selector_value_end~
+~newt_value_start~
 VALUE_TO_SEND (if applicable, otherwise leave empty)
-[newt_value_end]
-[newt_friendly_description_start]
+~newt_value_end~
+~newt_friendly_description_start~
 A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
-[newt_friendly_description_end]
-[newt_reasoning_start]
+~newt_friendly_description_end~
+~newt_reasoning_start~
 Brief explanation of your choice, considering any previous failures and the changes observed between the BEFORE and AFTER HTML
-[newt_reasoning_end]
+~newt_reasoning_end~
 ```
 
 IMPORTANT:
@@ -469,13 +323,13 @@ THAT'S AN ORDER, SOLDIER!
                     f.write(action)
 
             action_dict = {
-                "action": extract_line_based_content(action, "[newt_action_start]", "[newt_action_end]"),
-                "element_selector_type": extract_line_based_content(action, "[newt_element_selector_type_start]", "[newt_element_selector_type_end]") or "CSS_SELECTOR",
-                "element_selector_value": extract_line_based_content(action, "[newt_element_selector_value_start]", "[newt_element_selector_value_end]") or "",
-                "value": extract_line_based_content(action, "[newt_value_start]", "[newt_value_end]") or "",
-                "friendly_description": extract_line_based_content(action, "[newt_friendly_description_start]", "[newt_friendly_description_end]") or "",
-                "reasoning": extract_line_based_content(action, "[newt_reasoning_start]", "[newt_reasoning_end]") or "",
-                "element": f"{extract_line_based_content(action, '[newt_element_selector_type_start]', '[newt_element_selector_type_end]') or 'CSS_SELECTOR'}:{extract_line_based_content(action, '[newt_element_selector_value_start]', '[newt_element_selector_value_end]') or ''}"
+                "action": extract_line_based_content(action, "~newt_action_start~", "~newt_action_end~"),
+                "element_selector_type": extract_line_based_content(action, "~newt_element_selector_type_start~", "~newt_element_selector_type_end~") or "CSS_SELECTOR",
+                "element_selector_value": extract_line_based_content(action, "~newt_element_selector_value_start~", "~newt_element_selector_value_end~") or "",
+                "value": extract_line_based_content(action, "~newt_value_start~", "~newt_value_end~") or "",
+                "friendly_description": extract_line_based_content(action, "~newt_friendly_description_start~", "~newt_friendly_description_end~") or "",
+                "reasoning": extract_line_based_content(action, "~newt_reasoning_start~", "~newt_reasoning_end~") or "",
+                "element": f"{extract_line_based_content(action, '~newt_element_selector_type_start~', '~newt_element_selector_type_end~') or 'CSS_SELECTOR'}:{extract_line_based_content(action, '~newt_element_selector_value_start~', '~newt_element_selector_value_end~') or ''}"
             }
 
             return action_dict
@@ -624,7 +478,7 @@ THAT'S AN ORDER, SOLDIER!
             return {'success': False, 'screenshot': None}
 
     def detect_bug(self):
-        current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        current_html = self.html_simplifier.simplify_html(self.html_simplifier.get_visible_html(self.driver))
         html_diff = self.get_html_diff(self.previous_html, current_html)
 
         newt_operation_summary = """
@@ -680,18 +534,18 @@ Avoid:
 Respond ONLY with the following:
 
 ```
-[newt_isnewbug_start]
+~newt_isnewbug_start~
 True or False
-[newt_isnewbug_end]
-[newt_severity_start]
+~newt_isnewbug_end~
+~newt_severity_start~
 High, Medium or Low
-[newt_severity_end]
-[newt_description_start]
+~newt_severity_end~
+~newt_description_start~
 End user-friendly explanation of why this is a bug, with a list of end user-friendly steps to reproduce the bug. Include specific observations about what changed between BEFORE and AFTER.
-[newt_description_end]
-[newt_recommendation_start]
+~newt_description_end~
+~newt_recommendation_start~
 How to fix or work around this bug
-[newt_recommendation_end]
+~newt_recommendation_end~
 ```
         """
 
@@ -713,10 +567,10 @@ How to fix or work around this bug
 
             self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
             analysis_object = {
-                "is_bug": extract_line_based_content(analysis, "[newt_isnewbug_start]", "[newt_isnewbug_end]"),
-                "severity": extract_line_based_content(analysis, "[newt_severity_start]", "[newt_severity_end]"),
-                "description": extract_line_based_content(analysis, "[newt_description_start]", "[newt_description_end]"),
-                "recommendation": extract_line_based_content(analysis, "[newt_recommendation_start]", "[newt_recommendation_end]"),
+                "is_bug": extract_line_based_content(analysis, "~newt_isnewbug_start~", "~newt_isnewbug_end~"),
+                "severity": extract_line_based_content(analysis, "~newt_severity_start~", "~newt_severity_end~"),
+                "description": extract_line_based_content(analysis, "~newt_description_start~", "~newt_description_end~"),
+                "recommendation": extract_line_based_content(analysis, "~newt_recommendation_start~", "~newt_recommendation_end~"),
             }
             return analysis_object.get('is_bug', False), analysis_object
         except Exception as e:
@@ -739,7 +593,7 @@ How to fix or work around this bug
             return None
 
     def is_directive_complete(self):
-        current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        current_html = self.html_simplifier.simplify_html(self.html_simplifier.get_visible_html(self.driver))
         html_diff = self.get_html_diff(self.previous_html, current_html)
 
         newt_operation_summary = """
@@ -781,15 +635,15 @@ Consider:
 Respond ONLY with the following:
 
 ```
-[newt_iscomplete_start]
+~newt_iscomplete_start~
 True or False
-[newt_iscomplete_end]
-[newt_reasoning_start]
+~newt_iscomplete_end~
+~newt_reasoning_start~
 Detailed explanation of why testing should continue or stop, including observations about what changed between BEFORE and AFTER
-[newt_reasoning_end]
-[newt_nextarea_start]
+~newt_reasoning_end~
+~newt_nextarea_start~
 If not complete, suggest the next area to test based on the observed changes
-[newt_nextarea_end]
+~newt_nextarea_end~
 ```
         """
 
@@ -808,7 +662,7 @@ If not complete, suggest the next area to test based on the observed changes
                 with open(response_filename, "w") as f:
                     f.write(completion_check)
 
-            parsed_completion_check = extract_line_based_content(completion_check, "[newt_iscomplete_start]", "[newt_iscomplete_end]")
+            parsed_completion_check = extract_line_based_content(completion_check, "~newt_iscomplete_start~", "~newt_iscomplete_end~")
             return parsed_completion_check == "True"
         except Exception as e:
             self.logger.error(f"Bot {self.bot_id} - Error in completion check: {str(e)}")
