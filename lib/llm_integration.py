@@ -8,7 +8,7 @@ def extract_line_based_content(response_content, start_marker, end_marker):
         start = response_content.find(start_marker)
         end = response_content.find(end_marker)
         if start != -1 and end != -1:
-            content = response_content[start + len(start_marker):end].strip()
+            content = response_content[start + len(start_marker):end~.strip()
             return content
         return ""
     except Exception as e:
