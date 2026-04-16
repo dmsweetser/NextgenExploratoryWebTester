@@ -13,6 +13,7 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup, Tag
 import uuid
 from lib.llm_integration import extract_line_based_content
+import difflib
 
 class BotThread(threading.Thread):
     def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None):
@@ -35,6 +36,7 @@ class BotThread(threading.Thread):
         self.failure_count = 0
         self.select_options_cache = {}
         self.previous_html = ""
+        self.max_diff_lines = Config.get_max_diff_lines() if hasattr(Config, 'get_max_diff_lines') else 10
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -75,7 +77,7 @@ class BotThread(threading.Thread):
                     context = {
                         'directive': self.directive,
                         'previous_page': self.previous_html,
-                        'current_page': current_html,
+                        'current_page': self.get_html_diff(self.previous_html, current_html),
                         'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
                         'steps_taken': steps_taken,
                         'current_url': current_url,
@@ -127,6 +129,19 @@ class BotThread(threading.Thread):
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
         finally:
             self.cleanup()
+
+    def get_html_diff(self, before_html, after_html):
+        """Generate a diff between before and after HTML, showing only changes if they're small"""
+        before_lines = before_html.splitlines()
+        after_lines = after_html.splitlines()
+
+        diff = list(difflib.unified_diff(before_lines, after_lines, n=0))
+
+        # If diff is small, return just the diff
+        if len(diff) <= self.max_diff_lines + 3:  # +3 for diff header lines
+            return "\n".join(diff)
+        else:
+            return after_html
 
     def get_visible_html(self, driver):
         try:
@@ -316,8 +331,29 @@ Available actions:
 8. WAIT: Wait for a specific element to be present
         """
 
+        newt_operation_summary = """
+NEWT OPERATION SUMMARY:
+You are an AI-driven exploratory web testing bot. Your goal is to thoroughly test web applications by:
+1. Making intelligent decisions about what actions to take based on the current page state
+2. Analyzing page content for bugs, usability issues, and unexpected behaviors
+3. Exploring edge cases and unusual scenarios within the bounds of your directive
+4. Being curious and trying to break the system to find hidden issues
+
+You receive:
+- The testing directive (what you should test)
+- The BEFORE HTML (complete page state before your last action)
+- The AFTER HTML (either a diff showing changes or the complete page state after your last action)
+- Steps you've already taken
+- Known bugs to avoid
+- Current URL and select options cache
+
+Your output must follow the strict format provided in the prompt.
+"""
+
         prompt = f"""
-You are an exploratory web testing bot. Your current directive is: {context['directive']}
+{newt_operation_summary}
+
+Current directive: {context['directive']}
 
 Page HTML BEFORE the most recent action (simplified):
 {context['previous_page']}
@@ -556,8 +592,26 @@ THAT'S AN ORDER, SOLDIER!
 
     def detect_bug(self):
         current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        html_diff = self.get_html_diff(self.previous_html, current_html)
+
+        newt_operation_summary = """
+NEWT BUG DETECTION SUMMARY:
+You are analyzing page changes to detect bugs. Your goal is to:
+1. Identify malfunctions, logical blocking, typos, or unexpected behaviors
+2. Focus on end-user experience rather than technical implementation details
+3. Detect issues that would impact real users of the application
+4. Avoid false positives from test infrastructure or temporary states
+
+You receive:
+- The testing directive (what should be tested)
+- The complete BEFORE HTML (page state before the last action)
+- The AFTER HTML (either a diff showing changes or the complete page state after the last action)
+- Steps taken to reach this state
+- Known bugs to avoid reporting duplicates
+"""
+
         prompt = f"""
-Analyze the following page content and determine if there's a new bug based on the previous action.
+{newt_operation_summary}
 
 Current directive: {self.directive}
 
@@ -565,7 +619,7 @@ Page HTML BEFORE the most recent action (simplified):
 {self.previous_html}
 
 Page HTML AFTER the most recent action (simplified):
-{current_html}
+{html_diff}
 
 Steps taken:
 {self.get_step_text()}
@@ -653,8 +707,19 @@ How to fix or work around this bug
 
     def is_directive_complete(self):
         current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        html_diff = self.get_html_diff(self.previous_html, current_html)
+
+        newt_operation_summary = """
+NEWT COMPLETION CHECK SUMMARY:
+You are determining if testing should continue or if the directive has been satisfied. Consider:
+1. Whether all major functionality areas have been explored
+2. If edge cases and unusual scenarios have been tested
+3. Whether the directive's requirements have been met
+4. If there are still unexplored areas based on the page changes
+"""
+
         prompt = f"""
-Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
+{newt_operation_summary}
 
 Current directive: {self.directive}
 
@@ -662,7 +727,7 @@ Page HTML BEFORE the most recent action (simplified):
 {self.previous_html}
 
 Page HTML AFTER the most recent action (simplified):
-{current_html}
+{html_diff}
 
 Steps taken:
 {self.get_step_text()}

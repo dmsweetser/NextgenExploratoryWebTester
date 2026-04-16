@@ -123,3 +123,7 @@ class Config:
     @classmethod
     def get_max_prompt_tokens(cls) -> int:
         return int(os.getenv('MAX_PROMPT_TOKENS', '131000'))
+
+    @classmethod
+    def get_max_diff_lines(cls) -> int:
+        return int(os.getenv('MAX_DIFF_LINES', '10'))
