@@ -13,6 +13,27 @@ class HTMLSimplifier:
 
     def get_visible_html(self, driver):
         try:
+            # First try with visibility check
+            result = self._get_visible_html_with_visibility(driver)
+            if result and "<body>" in result and "</body>" in result and result != "<!DOCTYPE html>\n<html><body></body></html>":
+                return result
+
+            # If visibility check returns empty or error, try without visibility check
+            self.logger.warning("Visibility check returned empty result, trying without visibility check")
+            result = self._get_visible_html_without_visibility(driver)
+            if result and "<body>" in result and "</body>" in result and result != "<!DOCTYPE html>\n<html><body></body></html>":
+                return result
+
+            # If still empty, return full page source
+            self.logger.warning("Both visibility checks returned empty result, returning full page source")
+            return driver.page_source
+
+        except Exception as e:
+            self.logger.error(f"Error in get_visible_html: {str(e)}")
+            return driver.page_source
+
+    def _get_visible_html_with_visibility(self, driver):
+        try:
             # JS visibility logic
             js_visibility_check = """
                 const el = arguments[0];
@@ -151,8 +172,25 @@ class HTMLSimplifier:
 
             return "<!DOCTYPE html>\n" + str(new_html)
         except Exception as e:
-            self.logger.error(f"Error in get_visible_html: {str(e)}")
-            return "<html><body>Error processing page HTML</body></html>"
+            self.logger.error(f"Error in _get_visible_html_with_visibility: {str(e)}")
+            return None
+
+    def _get_visible_html_without_visibility(self, driver):
+        try:
+            # STEP 1 — Re-read the DOM
+            try:
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+            except Exception:
+                return "<html><body>Error processing page HTML</body></html>"
+
+            # STEP 2 — Remove script, style, and other noise tags
+            for tag in soup(["script", "style", "noscript", "meta", "link", "svg", "canvas", "img", "iframe", "object", "embed"]):
+                tag.decompose()
+
+            return "<!DOCTYPE html>\n" + str(soup)
+        except Exception as e:
+            self.logger.error(f"Error in _get_visible_html_without_visibility: {str(e)}")
+            return None
 
     def simplify_html(self, html: str) -> str:
         self.max_prompt_tokens = Config.get_max_prompt_tokens()
@@ -167,6 +205,28 @@ class HTMLSimplifier:
             "svg", "canvas", "img", "iframe", "object", "embed"
         ]):
             tag.decompose()
+
+        # --- Generate full CSS path for element hierarchy ---
+        def get_css_path(el):
+            if not el or not el.name or el.name == "[document]":
+                return ""
+
+            path = []
+            for parent in el.parents:
+                if parent.name == "[document]":
+                    break
+
+                siblings = [sib for sib in parent.children if sib.name == el.name]
+                if len(siblings) > 1:
+                    index = siblings.index(el) + 1
+                    path.append(f"{el.name}:nth-of-type({index})")
+                else:
+                    path.append(el.name)
+
+                el = parent
+
+            path.reverse()
+            return " > ".join(path)
 
         # --- Direct text only ---
         def direct_text(el):
@@ -241,6 +301,7 @@ class HTMLSimplifier:
             if consolidate_label(el):
                 return
 
+            css_path = get_css_path(el)
             sel = short_selector(el)
             attrs = relevant_attrs(el)
             text = direct_text(el)
@@ -249,55 +310,19 @@ class HTMLSimplifier:
             if el.name in ["div", "span", "li"] and not attrs and not text:
                 return
 
-            # Text-bearing tags
-            if el.name in [
-                "h1", "h2", "h3", "h4", "h5", "h6",
-                "p", "span", "li", "strong", "em", "b", "i", "div"
-            ]:
-                if text:
-                    line = f"{sel}: '{text}'"
-                elif attrs:
-                    line = f"{sel} {attrs}"
-                else:
-                    line = sel
-                self._add_line(line)
-                return
-
-            # Links
-            if el.name == "a":
-                if text:
-                    line = f"{sel} {attrs}: '{text}'"
-                else:
-                    line = f"{sel} {attrs}"
-                self._add_line(line)
-                return
-
-            # Buttons
-            if el.name == "button":
-                if text:
-                    line = f"{sel} {attrs}: '{text}'"
-                else:
-                    line = f"{sel} {attrs}"
-                self._add_line(line)
-                return
-
-            # Inputs
-            if el.name == "input":
-                line = f"{sel} {attrs}"
-                self._add_line(line)
-                return
-
-            # Selects
-            if el.name == "select":
-                line = f"{sel} {attrs}"
-                self._add_line(line)
-                return
-
-            # Fallback
-            if attrs:
-                self._add_line(f"{sel} {attrs}")
+            # Format the line with hierarchy information
+            if css_path:
+                line = f"{css_path} [{sel}]"
             else:
-                self._add_line(sel)
+                line = sel
+
+            if attrs:
+                line += f" {attrs}"
+
+            if text:
+                line += f": '{text}'"
+
+            self._add_line(line + "\n")
 
         # --- Process DOM ---
         for el in soup.body.descendants if soup.body else soup.descendants:
