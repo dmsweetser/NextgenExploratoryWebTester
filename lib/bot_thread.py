@@ -37,6 +37,7 @@ class BotThread(threading.Thread):
         self.select_options_cache = {}
         self.previous_html = ""
         self.max_diff_lines = Config.get_max_diff_lines() if hasattr(Config, 'get_max_diff_lines') else 10
+        self.restarted = False
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -46,6 +47,11 @@ class BotThread(threading.Thread):
             self.llm = self.llm_factory.create_llm()
 
             step_number = len(self.db.get_steps(self.bot_id)) + 1
+
+            if self.restarted:
+                self.record_restart_step(step_number)
+                step_number += 1
+                self.restarted = False
 
             try:
                 self.driver.get(self.start_url)
@@ -129,6 +135,33 @@ class BotThread(threading.Thread):
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
         finally:
             self.cleanup()
+
+    def record_restart_step(self, step_number):
+        """Record a step indicating the bot was restarted"""
+        try:
+            restart_description = "Bot was restarted and returned to initial state"
+            restart_reasoning = "The bot was stopped by the user and then restarted. This step records the restart event to provide context for subsequent actions."
+
+            # Capture screenshot of the initial state after restart
+            full_screenshot_data = None
+            try:
+                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+            except Exception as e:
+                self.logger.error(f"Bot {self.bot_id} - Error capturing restart screenshot: {str(e)}")
+
+            self.db.add_step(
+                self.bot_id,
+                step_number,
+                "SYSTEM: BOT_RESTART",
+                "SYSTEM:RESTART",
+                full_screenshot_data,
+                restart_description,
+                restart_reasoning,
+                True
+            )
+            self.logger.info(f"Bot {self.bot_id} recorded restart step {step_number}")
+        except Exception as e:
+            self.logger.error(f"Bot {self.bot_id} - Error recording restart step: {str(e)}")
 
     def get_html_diff(self, before_html, after_html):
         """Generate a diff between before and after HTML, showing only changes if they're small"""
