@@ -187,6 +187,7 @@ def restart_bot(bot_id):
         logger=logger,
         steps_taken=[]
     )
+    bot_thread.restarted = True
     bot_thread.start()
     bot_manager.add_bot(bot_thread)
     db.update_bot_status(bot_id, 'running', datetime.now().isoformat())
