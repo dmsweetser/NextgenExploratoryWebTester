@@ -13,6 +13,7 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup, Tag
 import uuid
 from lib.llm_integration import extract_line_based_content
+import difflib
 
 class BotThread(threading.Thread):
     def __init__(self, bot_id, start_url, directive, db, bot_manager, bug_reporter, html_simplifier, screenshot_capturer, llm_factory, logger, steps_taken=None):
@@ -34,6 +35,8 @@ class BotThread(threading.Thread):
         self.max_failures = Config.get_max_failures()
         self.failure_count = 0
         self.select_options_cache = {}
+        self.previous_html = ""
+        self.max_diff_lines = Config.get_max_diff_lines() if hasattr(Config, 'get_max_diff_lines') else 10
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -53,12 +56,13 @@ class BotThread(threading.Thread):
                 except:
                     pass
                 time.sleep(2)
+                self.previous_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error navigating to URL: {str(e)}")
                 self.failure_count += 1
 
             while not self.stop_event.is_set() and self.failure_count < self.max_failures:
-                simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+                current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
                 current_url = self.driver.current_url
                 try:
                     # Check domain to prevent cross-domain navigation
@@ -72,7 +76,8 @@ class BotThread(threading.Thread):
 
                     context = {
                         'directive': self.directive,
-                        'current_page': simplified_html,
+                        'previous_page': self.previous_html,
+                        'current_page': self.get_html_diff(self.previous_html, current_html),
                         'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
                         'steps_taken': steps_taken,
                         'current_url': current_url,
@@ -99,8 +104,8 @@ class BotThread(threading.Thread):
                         self.logger.error(f"Bot {self.bot_id} - Error in bug detection: {str(e)}")
                         self.failure_count += 1
 
-                    # Update simplified HTML
-                    simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+                    # Update previous HTML for next iteration
+                    self.previous_html = current_html
 
                     # Check if directive is complete
                     if Config.get_allow_conclude():
@@ -120,11 +125,23 @@ class BotThread(threading.Thread):
                     self.failure_count += 1
                     time.sleep(2)  # Brief pause to prevent rapid error loops
 
-
         except Exception as e:
             logging.error(f"Error in bot {self.bot_id}: {str(e)}")
         finally:
             self.cleanup()
+
+    def get_html_diff(self, before_html, after_html):
+        """Generate a diff between before and after HTML, showing only changes if they're small"""
+        before_lines = before_html.splitlines()
+        after_lines = after_html.splitlines()
+
+        diff = list(difflib.unified_diff(before_lines, after_lines, n=0))
+
+        # If diff is small, return just the diff
+        if len(diff) <= self.max_diff_lines + 3:  # +3 for diff header lines
+            return "\n".join(diff)
+        else:
+            return after_html
 
     def get_visible_html(self, driver):
         try:
@@ -314,10 +331,34 @@ Available actions:
 8. WAIT: Wait for a specific element to be present
         """
 
-        prompt = f"""
-You are an exploratory web testing bot. Your current directive is: {context['directive']}
+        newt_operation_summary = """
+NEWT OPERATION SUMMARY:
+You are an AI-driven exploratory web testing bot. Your goal is to thoroughly test web applications by:
+1. Making intelligent decisions about what actions to take based on the current page state
+2. Analyzing page content for bugs, usability issues, and unexpected behaviors
+3. Exploring edge cases and unusual scenarios within the bounds of your directive
+4. Being curious and trying to break the system to find hidden issues
 
-Current page HTML (simplified):
+You receive:
+- The testing directive (what you should test)
+- The BEFORE HTML (complete page state before your last action)
+- The AFTER HTML (either a diff showing changes or the complete page state after your last action)
+- Steps you've already taken
+- Known bugs to avoid
+- Current URL and select options cache
+
+Your output must follow the strict format provided in the prompt.
+"""
+
+        prompt = f"""
+{newt_operation_summary}
+
+Current directive: {context['directive']}
+
+Page HTML BEFORE the most recent action (simplified):
+{context['previous_page']}
+
+Page HTML AFTER the most recent action (simplified):
 {context['current_page']}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
@@ -359,9 +400,9 @@ VALUE_TO_SEND (if applicable, otherwise leave empty)
 A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
 [newt_friendly_description_end]
 [newt_reasoning_start]
-Brief explanation of your choice, considering any previous failures
+Brief explanation of your choice, considering any previous failures and the changes observed between the BEFORE and AFTER HTML
 [newt_reasoning_end]
-```        
+```
 
 IMPORTANT:
 1) If the previous action failed, choose a different approach or try a similar action with a different selector
@@ -374,6 +415,7 @@ IMPORTANT:
 8) Be curious! Try something UNUSUAL, EDGE CASE, or POTENTIALLY BREAKING within the bounds of your directive.
 9) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
 10) ONLY determine your next action based on the known current page and nothing else
+11) Pay special attention to the differences between the BEFORE and AFTER HTML to understand what changed and guide your next action
 
 THAT'S AN ORDER, SOLDIER!
         """
@@ -549,11 +591,35 @@ THAT'S AN ORDER, SOLDIER!
             return {'success': False, 'screenshot': None}
 
     def detect_bug(self):
-        simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        html_diff = self.get_html_diff(self.previous_html, current_html)
+
+        newt_operation_summary = """
+NEWT BUG DETECTION SUMMARY:
+You are analyzing page changes to detect bugs. Your goal is to:
+1. Identify malfunctions, logical blocking, typos, or unexpected behaviors
+2. Focus on end-user experience rather than technical implementation details
+3. Detect issues that would impact real users of the application
+4. Avoid false positives from test infrastructure or temporary states
+
+You receive:
+- The testing directive (what should be tested)
+- The complete BEFORE HTML (page state before the last action)
+- The AFTER HTML (either a diff showing changes or the complete page state after the last action)
+- Steps taken to reach this state
+- Known bugs to avoid reporting duplicates
+"""
+
         prompt = f"""
-Analyze the following page content and determine if there's a new bug based on the previous action.
+{newt_operation_summary}
 
 Current directive: {self.directive}
+
+Page HTML BEFORE the most recent action (simplified):
+{self.previous_html}
+
+Page HTML AFTER the most recent action (simplified):
+{html_diff}
 
 Steps taken:
 {self.get_step_text()}
@@ -561,17 +627,15 @@ Steps taken:
 Known bugs:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
-Current page HTML (simplified):
-{simplified_html}
-
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
 Consider:
-1. Any error messages, exceptions, or malfunctions
+1. Any error messages, exceptions, or malfunctions that appeared after the action
 2. Logical blocking - an inability to complete your directive based on steps taken and current state of the page
 3. Typos or incorrect text that indicates a problem
-4. Unexpected page states or behaviors
+4. Unexpected page states or behaviors, especially changes between BEFORE and AFTER HTML
 5. Edge cases or unusual conditions that might indicate a bug
+6. Any differences between the BEFORE and AFTER HTML that suggest unexpected behavior
 
 Avoid:
 1. Reporting a bug that is the same as an existing known bug
@@ -590,7 +654,7 @@ True or False
 High, Medium or Low
 [newt_severity_end]
 [newt_description_start]
-End user-friendly explanation of why this is a bug, along with a list of end user-friendly steps to reproduce the bug
+End user-friendly explanation of why this is a bug, with a list of end user-friendly steps to reproduce the bug. Include specific observations about what changed between BEFORE and AFTER.
 [newt_description_end]
 [newt_recommendation_start]
 How to fix or work around this bug
@@ -642,20 +706,34 @@ How to fix or work around this bug
             return None
 
     def is_directive_complete(self):
-        simplified_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        current_html = self.html_simplifier.simplify_html(self.get_visible_html(self.driver))
+        html_diff = self.get_html_diff(self.previous_html, current_html)
+
+        newt_operation_summary = """
+NEWT COMPLETION CHECK SUMMARY:
+You are determining if testing should continue or if the directive has been satisfied. Consider:
+1. Whether all major functionality areas have been explored
+2. If edge cases and unusual scenarios have been tested
+3. Whether the directive's requirements have been met
+4. If there are still unexplored areas based on the page changes
+"""
+
         prompt = f"""
-Based on the current page content and the NEWT bot's directive, determine if the testing is complete.
+{newt_operation_summary}
 
 Current directive: {self.directive}
+
+Page HTML BEFORE the most recent action (simplified):
+{self.previous_html}
+
+Page HTML AFTER the most recent action (simplified):
+{html_diff}
 
 Steps taken:
 {self.get_step_text()}
 
 Known bugs to avoid:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
-
-Current page HTML (simplified):
-{simplified_html}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
@@ -665,6 +743,7 @@ Consider:
 3. Is there any indication that testing should continue?
 4. Have all major functionality areas been covered?
 5. Have you tried edge cases and unusual scenarios?
+6. Based on the differences between BEFORE and AFTER HTML, are there any unexplored areas?
 
 Respond ONLY with the following:
 
@@ -673,10 +752,10 @@ Respond ONLY with the following:
 True or False
 [newt_iscomplete_end]
 [newt_reasoning_start]
-Detailed explanation of why testing should continue or stop
+Detailed explanation of why testing should continue or stop, including observations about what changed between BEFORE and AFTER
 [newt_reasoning_end]
 [newt_nextarea_start]
-If not complete, suggest the next area to test
+If not complete, suggest the next area to test based on the observed changes
 [newt_nextarea_end]
 ```
         """
