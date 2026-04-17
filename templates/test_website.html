@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Website</title>
+    <title>NEWT Test Website (Enhanced)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -22,48 +22,100 @@
             padding: 15px;
             margin: 20px 0;
         }
+        .hidden-unless-hover:hover + .hidden-content {
+            display: block;
+        }
+        .hidden-content {
+            display: none;
+            color: red;
+        }
+        .invisible {
+            visibility: hidden;
+        }
+        .zero-size {
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4">Test Website for NEWT</h1>
-        <p class="lead">This is a dummy website for testing the NEWT (Next-gen Exploratory Web Tester) bot.</p>
+        <h1 class="mb-4">NEWT Test Website</h1>
+        <p class="lead">Enhanced test site for validating the HTML simplifier and detecting bugs.</p>
 
+        <!-- Login Form with Validation -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Login Form</h5>
+                <h5>Login Form (With Validation)</h5>
             </div>
             <div class="card-body">
                 <form id="loginForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" placeholder="Enter username">
+                        <input type="text" class="form-control" id="username" placeholder="Enter username" required>
+                        <div id="usernameError" class="invalid-feedback" style="display: none;">
+                            Username is required.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" placeholder="Enter password">
+                        <input type="password" class="form-control" id="password" placeholder="Enter password" required>
+                        <div id="passwordError" class="invalid-feedback" style="display: none;">
+                            Password must be at least 8 characters.
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Login</button>
-                    <button type="button" class="btn btn-secondary" id="showErrorBtn">Show Error</button>
+                    <button type="button" class="btn btn-secondary" id="showErrorBtn">Show Validation Errors</button>
+                    <button type="button" class="btn btn-warning" id="toggleHiddenFieldBtn">Toggle Hidden Field</button>
                 </form>
+                <div id="hiddenFieldContainer" style="display: none; margin-top: 10px;">
+                    <label for="hiddenField" class="form-label">Hidden Field (Should Not Be Visible Initially)</label>
+                    <input type="text" class="form-control" id="hiddenField" placeholder="This field is hidden">
+                </div>
                 <script>
-                    // Prevent form submission from triggering alert
                     document.getElementById('loginForm').addEventListener('submit', function(e) {
                         e.preventDefault();
-                        alert('Login form submitted!');
+                        const username = document.getElementById('username').value;
+                        const password = document.getElementById('password').value;
+                        let isValid = true;
+
+                        if (!username) {
+                            document.getElementById('usernameError').style.display = 'block';
+                            isValid = false;
+                        } else {
+                            document.getElementById('usernameError').style.display = 'none';
+                        }
+
+                        if (!password || password.length < 8) {
+                            document.getElementById('passwordError').style.display = 'block';
+                            isValid = false;
+                        } else {
+                            document.getElementById('passwordError').style.display = 'none';
+                        }
+
+                        if (isValid) {
+                            alert('Login successful!');
+                        }
                     });
 
-                    // Show error button
                     document.getElementById('showErrorBtn').addEventListener('click', function() {
-                        document.getElementById('errorMessage').style.display = 'block';
+                        document.getElementById('usernameError').style.display = 'block';
+                        document.getElementById('passwordError').style.display = 'block';
+                    });
+
+                    document.getElementById('toggleHiddenFieldBtn').addEventListener('click', function() {
+                        const container = document.getElementById('hiddenFieldContainer');
+                        container.style.display = container.style.display === 'none' ? 'block' : 'none';
                     });
                 </script>
             </div>
         </div>
 
+        <!-- Dropdown with Hidden Content -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Dropdown Menu</h5>
+                <h5>Dropdown Menu (With Hidden Content)</h5>
             </div>
             <div class="card-body">
                 <div class="dropdown">
@@ -74,55 +126,131 @@
                         <a class="dropdown-item" href="#">Option 1</a>
                         <a class="dropdown-item" href="#">Option 2</a>
                         <a class="dropdown-item" href="#">Option 3</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#" id="brokenLink">Broken Link (404)</a>
                     </div>
-                    <div id="youBetterNotShowUp" style="display:none">
-                        This better not show up during self-test
-                    </div>
+                </div>
+                <div class="hidden-unless-hover" style="margin-top: 10px; padding: 10px; background: #eee;">
+                    Hover over me to reveal hidden content!
+                </div>
+                <div class="hidden-content">
+                    This content is only visible on hover. The bot should NOT see this unless it simulates hover.
+                </div>
+                <div id="youBetterNotShowUp" style="display:none">
+                    This better not show up during self-test (display:none)
+                </div>
+                <div class="invisible">
+                    This is invisible (visibility:hidden)
+                </div>
+                <div class="zero-size">
+                    This is zero-sized (width/height:0)
                 </div>
             </div>
         </div>
 
+        <!-- Form with Select and Dynamic Options -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Form with Select</h5>
+                <h5>Dynamic Select Form</h5>
             </div>
             <div class="card-body">
                 <form>
                     <div class="mb-3">
-                        <label for="selectExample" class="form-label">Example Select</label>
-                        <select class="form-select" id="selectExample">
-                            <option selected>Open this select menu</option>
+                        <label for="dynamicSelect" class="form-label">Dynamic Select</label>
+                        <select class="form-select" id="dynamicSelect">
+                            <option selected>Select an option</option>
                             <option value="1">Option 1</option>
                             <option value="2">Option 2</option>
                             <option value="3">Option 3</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Submit</button>
+                    <div class="mb-3">
+                        <label for="dependentField" class="form-label">Dependent Field</label>
+                        <input type="text" class="form-control" id="dependentField" placeholder="This appears after selecting Option 3" style="display: none;">
+                    </div>
+                    <button type="button" class="btn btn-primary" id="updateSelectBtn">Update Select Options</button>
+                    <button type="submit" class="btn btn-secondary">Submit</button>
                 </form>
+                <script>
+                    document.getElementById('dynamicSelect').addEventListener('change', function() {
+                        const dependentField = document.getElementById('dependentField');
+                        dependentField.style.display = this.value === '3' ? 'block' : 'none';
+                    });
+
+                    document.getElementById('updateSelectBtn').addEventListener('click', function() {
+                        const select = document.getElementById('dynamicSelect');
+                        select.innerHTML = '<option selected>Updated Option 1</option><option>Updated Option 2</option>';
+                    });
+                </script>
             </div>
         </div>
 
+        <!-- Buttons with Various States -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Buttons</h5>
+                <h5>Button States</h5>
             </div>
             <div class="card-body">
-                <button class="btn btn-primary btn-custom">Primary Button</button>
-                <button class="btn btn-secondary btn-custom">Secondary Button</button>
-                <button class="btn btn-success btn-custom">Success Button</button>
-                <button class="btn btn-danger btn-custom">Danger Button</button>
-                <button class="btn btn-warning btn-custom">Warning Button</button>
-                <button class="btn btn-info btn-custom">Info Button</button>
-                <button class="btn btn-light btn-custom">Light Button</button>
-                <button class="btn btn-dark btn-custom">Dark Button</button>
+                <button class="btn btn-primary btn-custom" id="normalButton">Normal Button</button>
+                <button class="btn btn-secondary btn-custom" id="disabledButton" disabled>Disabled Button</button>
+                <button class="btn btn-success btn-custom" id="jsButton">JS Button (Click Me)</button>
+                <button class="btn btn-danger btn-custom" id="errorButton">Simulate Error</button>
+                <button class="btn btn-warning btn-custom" id="slowButton">Slow Response (3s)</button>
+                <script>
+                    document.getElementById('jsButton').addEventListener('click', function() {
+                        alert('JavaScript button clicked!');
+                    });
+
+                    document.getElementById('errorButton').addEventListener('click', function() {
+                        document.getElementById('simulatedError').style.display = 'block';
+                    });
+
+                    document.getElementById('slowButton').addEventListener('click', function() {
+                        this.disabled = true;
+                        this.textContent = 'Loading...';
+                        setTimeout(() => {
+                            this.disabled = false;
+                            this.textContent = 'Slow Response (3s)';
+                            alert('Slow response completed!');
+                        }, 3000);
+                    });
+                </script>
+                <div id="simulatedError" style="display: none; color: red; margin-top: 10px;">
+                    ERROR: This is a simulated error for the bot to detect!
+                </div>
             </div>
         </div>
 
+        <!-- Known Bugs Section -->
         <div class="bug-section">
-            <h5>Known Bug</h5>
-            <p>This form has a known bug - when you click the "Show Error" button, it will display an error message that the bot should detect.</p>
-            <div id="errorMessage" style="display: none; color: red; margin-top: 10px;">
-                ERROR: This is a test error that the bot should detect as a bug!
+            <h5>Known Bugs and Edge Cases</h5>
+            <ul>
+                <li><strong>Validation Errors:</strong> Click "Show Validation Errors" to reveal hidden error messages.</li>
+                <li><strong>Hidden Field:</strong> Click "Toggle Hidden Field" to show/hide a field dynamically.</li>
+                <li><strong>Broken Link:</strong> The "Broken Link (404)" in the dropdown menu leads nowhere.</li>
+                <li><strong>Hover Content:</strong> The "Hover over me" div reveals content only on hover (should not be visible to the bot unless it simulates hover).</li>
+                <li><strong>Invisible/Zero-sized Elements:</strong> These should not be visible or interactable.</li>
+                <li><strong>Dynamic Select:</strong> Selecting "Option 3" reveals a dependent field. The "Update Select Options" button changes the select options dynamically.</li>
+                <li><strong>Simulated Error:</strong> Click "Simulate Error" to show an error message.</li>
+                <li><strong>Slow Response:</strong> Click "Slow Response (3s)" to simulate a slow API call.</li>
+            </ul>
+        </div>
+
+        <!-- Accessibility Issues -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Accessibility Issues</h5>
+            </div>
+            <div class="card-body">
+                <p>This section contains intentional accessibility issues for the bot to detect:</p>
+                <img src="missing-image.jpg" alt="" class="mb-3"> <!-- Missing alt text -->
+                <button class="btn btn-info" aria-label="">No ARIA Label</button> <!-- Missing ARIA label -->
+                <div role="alert" style="color: red;">This is an alert with no visible text for screen readers.</div>
+                <form>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" placeholder="No label or ARIA"> <!-- Missing label -->
+                    </div>
+                </form>
             </div>
         </div>
     </div>
