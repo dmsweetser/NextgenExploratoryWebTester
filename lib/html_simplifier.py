@@ -14,12 +14,12 @@ class HTMLSimplifier:
         try:
             # Try with visibility check
             result = self._get_visible_html_with_visibility(driver)
-            if result and "<body>" in result and "</body>" in result and result != "<!DOCTYPE html>\n<html><body></body></html>":
+            if result and self._is_html_sufficiently_populated(result):
                 return result
 
             # Fallback: without visibility check
             result = self._get_visible_html_without_visibility(driver)
-            if result and "<body>" in result and "</body>" in result and result != "<!DOCTYPE html>\n<html><body></body></html>":
+            if result and self._is_html_sufficiently_populated(result):
                 return result
 
             # Final fallback: full page source
@@ -29,6 +29,25 @@ class HTMLSimplifier:
             print(f"Error in get_visible_html: {str(e)}")
             traceback.print_exc()
             return driver.page_source
+
+    def _is_html_sufficiently_populated(self, html):
+        """Check if HTML contains sufficient content beyond just basic structure"""
+        if not html or "<body>" not in html or "</body>" not in html:
+            return False
+
+        # Remove basic structure and check if there's meaningful content
+        content = html.replace("<!DOCTYPE html>", "") \
+                     .replace("<html>", "") \
+                     .replace("</html>", "") \
+                     .replace("<head>", "") \
+                     .replace("</head>", "") \
+                     .replace("<body>", "") \
+                     .replace("</body>", "") \
+                     .strip()
+
+        # Count meaningful content (tags, text, etc.)
+        meaningful_content = len(content.replace(" ", "").replace("\n", "").replace("\t", ""))
+        return meaningful_content > 20  # Arbitrary threshold for meaningful content
 
     def _get_visible_html_with_visibility(self, driver):
         try:
