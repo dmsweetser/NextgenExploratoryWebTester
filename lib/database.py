@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import datetime
 
@@ -96,7 +97,7 @@ class Database:
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
         c.execute("INSERT INTO steps (bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                 (bot_id, step_number, action, element, screenshot_data, friendly_description, reasoning, success))
+                 (bot_id, step_number, action, element, json.dumps(screenshot_data), friendly_description, reasoning, success))
         conn.commit()
         conn.close()
 
@@ -105,7 +106,16 @@ class Database:
         c = conn.cursor()
         c.execute("SELECT * FROM steps WHERE bot_id = ? ORDER BY step_number", (bot_id,))
         columns = [column[0] for column in c.description]
-        steps = [dict(zip(columns, row)) for row in c.fetchall()]
+        steps = []
+        for row in c.fetchall():
+            step = dict(zip(columns, row))
+            # Parse screenshot_json if it exists
+            if step.get('screenshot_data'):
+                try:
+                    step['screenshot_data'] = json.loads(step['screenshot_data'])
+                except:
+                    pass
+            steps.append(step)
         conn.close()
         return steps
 

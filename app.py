@@ -1,7 +1,8 @@
 from datetime import datetime
 import os
 import logging
-from flask import Flask, render_template, request, redirect, url_for, send_file
+import sqlite3
+from flask import Flask, jsonify, render_template, request, redirect, url_for, send_file
 import json
 from lib.config import Config
 from lib.bot_thread import BotThread
@@ -229,6 +230,25 @@ def run_self_test():
 @app.route('/test-website')
 def test_website():
     return render_template('test_website.html')
+
+@app.route('/api/step/<int:step_id>/screenshot')
+def get_step_screenshot(step_id):
+    conn = sqlite3.connect('data/bots.db')
+    c = conn.cursor()
+    c.execute("SELECT screenshot_data FROM steps WHERE id = ?", (step_id,))
+    result = c.fetchone()
+    conn.close()
+
+    if result and result[0]:
+        try:
+            screenshot_data = json.loads(result[0])
+            return jsonify({
+                'full_screenshot': screenshot_data.get('full', '')
+            })
+        except:
+            pass
+
+    return jsonify({'error': 'Screenshot not found'}), 404
 
 if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):

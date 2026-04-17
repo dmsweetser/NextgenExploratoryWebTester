@@ -88,26 +88,40 @@
             <div class="timeline-item">
                 <div class="timeline-point"></div>
                 <div class="timeline-content">
-                    <h6 class="timeline-title">{{ step['friendly_description'] if step['friendly_description'] else step['action'] }}</h6>
+                    <h6 class="timeline-title">{{ step['friendly_description'] if step['friendly_description'] else
+                        step['action'] }}</h6>
                     <p class="timeline-time">{{ step['timestamp'] }}</p>
                     {% if step['reasoning'] %}
-                    <div class="step-details collapsed" data-bs-toggle="collapse" data-bs-target="#stepDetails-{{ step['id'] }}">
+                    <div class="step-details collapsed" data-bs-toggle="collapse"
+                        data-bs-target="#stepDetails-{{ step['id'] }}">
                         <span class="text-muted" role="button"><i class="bi bi-info-circle"></i> Details</span>
                     </div>
                     <div class="collapse mt-2" id="stepDetails-{{ step['id'] }}">
                         <div class="card card-body bg-light">
-                            <p><strong>Action:</strong> <pre style="white-space: pre-wrap; word-wrap: break-word;">{{ step['action'] }}</pre></p>
-                            <p><strong>Reasoning:</strong> <span style="white-space: pre-wrap; word-wrap: break-word;">{{ step['reasoning'] }}</span></p>
-                            <p><strong>Success:</strong> {% if step['success'] %}<span class="text-success">Yes</span>{% else %}<span class="text-danger">No</span>{% endif %}</p>
+                            <p><strong>Action:</strong>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;">{{ step['action'] }}</pre>
+                            </p>
+                            <p><strong>Reasoning:</strong> <span
+                                    style="white-space: pre-wrap; word-wrap: break-word;">{{ step['reasoning'] }}</span>
+                            </p>
+                            <p><strong>Success:</strong> {% if step['success'] %}<span class="text-success">Yes</span>{%
+                                else %}<span class="text-danger">No</span>{% endif %}</p>
                             {% if step['element'] %}
                             <p><strong>Element:</strong> <code>{{ step['element'] }}</code></p>
                             {% endif %}
                         </div>
                     </div>
                     {% endif %}
-                    {% if step['screenshot_data'] %}
-                    <img src="data:image/png;base64,{{ step['screenshot_data'] }}" class="screenshot-thumb img-thumbnail"
-                        alt="NEWT step screenshot" onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')" style="max-height: 300px;">
+                    {% if step['screenshot_data'] and step['screenshot_data'].thumbnail %}
+                    <img src="data:image/png;base64,{{ step['screenshot_data'].thumbnail }}"
+                        class="screenshot-thumb img-thumbnail" alt="NEWT step screenshot"
+                        onclick="fetchFullImage({{ step['id'] }})" style="max-height: 300px;"
+                        data-step-id="{{ step['id'] }}">
+                    {% elif step['screenshot_data'] %}
+                    <img src="data:image/png;base64,{{ step['screenshot_data'] }}"
+                        class="screenshot-thumb img-thumbnail" alt="NEWT step screenshot"
+                        onclick="showFullImage('data:image/png;base64,{{ step['screenshot_data'] }}')"
+                        style="max-height: 300px;">
                     {% endif %}
                     <p class="text-muted"><small>Selector: <code>{{ step['element'] }}</code></small></p>
                 </div>
@@ -169,7 +183,7 @@
     <div class="card-body">
         <div class="alert alert-success">
             <h5>Testing Complete</h5>
-               <p>The NEWT bot has completed its testing cycle. Review the steps taken and any bugs found above.</p>
+            <p>The NEWT bot has completed its testing cycle. Review the steps taken and any bugs found above.</p>
         </div>
     </div>
 </div>

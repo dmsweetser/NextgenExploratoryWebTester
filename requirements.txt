@@ -11,3 +11,4 @@ werkzeug
 six
 zipfile36
 pyinstaller
+pillow
