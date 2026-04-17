@@ -226,6 +226,14 @@ You are an AI-driven exploratory web testing bot. Your goal is to thoroughly tes
 3. Exploring edge cases and unusual scenarios within the bounds of your directive
 4. Being curious and trying to break the system to find hidden issues
 
+IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
+- The HTML is SIMPLIFIED to remove noise and focus on semantic content
+- Styles, scripts, and non-essential attributes are removed
+- Hidden elements (display:none, visibility:hidden) are removed
+- Only visible, semantic content is preserved
+- This is INTENTIONAL to help you focus on functionality, not presentation
+- Missing styles or layout issues are NOT bugs - focus on functionality and user experience
+
 You receive:
 - The testing directive (what you should test)
 - The BEFORE HTML (complete page state before your last action)
@@ -374,11 +382,15 @@ THAT'S AN ORDER, SOLDIER!
             action_text = f"{action_type} on {element_selector_type}:{element_selector_value}"
 
             # Capture screenshot before action
-            full_screenshot_data = None
+            screenshot_data = None
             try:
-                full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                full_screenshot_data = screenshot_data['full']
+                thumbnail_data = screenshot_data['thumbnail']
             except Exception as e:
                 self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot: {str(e)}")
+                full_screenshot_data = None
+                thumbnail_data = None
 
             # Execute the action using Selenium with error handling
             try:
@@ -450,11 +462,18 @@ THAT'S AN ORDER, SOLDIER!
 
                 # Capture screenshot after action
                 try:
-                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                    screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                    full_screenshot_data = screenshot_data['full']
+                    thumbnail_data = screenshot_data['thumbnail']
                 except Exception as e:
                     self.logger.error(f"Bot {self.bot_id} - Error capturing screenshot after action: {str(e)}")
+                    full_screenshot_data = None
+                    thumbnail_data = None
 
-                self.db.add_step(self.bot_id, step_number, action_text, action['element'], full_screenshot_data, friendly_description, reasoning)
+                self.db.add_step(self.bot_id, step_number, action_text, action['element'], {
+                    'full': full_screenshot_data,
+                    'thumbnail': thumbnail_data
+                }, friendly_description, reasoning)
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
                 return {'success': True, 'screenshot': full_screenshot_data}
@@ -465,11 +484,18 @@ THAT'S AN ORDER, SOLDIER!
 
                 # Try to get a screenshot even if the action failed
                 try:
-                    full_screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                    screenshot_data = self.screenshot_capturer.capture_screenshot(self.driver)
+                    full_screenshot_data = screenshot_data['full']
+                    thumbnail_data = screenshot_data['thumbnail']
                 except Exception as screenshot_error:
                     self.logger.error(f"Bot {self.bot_id} - Error capturing error screenshot: {str(screenshot_error)}")
+                    full_screenshot_data = None
+                    thumbnail_data = None
 
-                self.db.add_step(self.bot_id, step_number, error_msg, action['element'], full_screenshot_data, friendly_description, reasoning, False)
+                self.db.add_step(self.bot_id, step_number, error_msg, action['element'], {
+                    'full': full_screenshot_data,
+                    'thumbnail': thumbnail_data
+                }, friendly_description, reasoning, False)
                 return {'success': False, 'screenshot': full_screenshot_data}
 
         except Exception as e:
@@ -488,6 +514,15 @@ You are analyzing page changes to detect bugs. Your goal is to:
 2. Focus on end-user experience rather than technical implementation details
 3. Detect issues that would impact real users of the application
 4. Avoid false positives from test infrastructure or temporary states
+
+IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
+- The HTML is SIMPLIFIED to remove noise and focus on semantic content
+- Styles, scripts, and non-essential attributes are removed
+- Hidden elements (display:none, visibility:hidden) are removed
+- Only visible, semantic content is preserved
+- This is INTENTIONAL to help you focus on functionality, not presentation
+- Missing styles, layout issues, or missing classes are NOT bugs
+- Focus on FUNCTIONALITY and USER EXPERIENCE issues
 
 You receive:
 - The testing directive (what should be tested)
@@ -516,19 +551,28 @@ Known bugs:
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
+IMPORTANT BUG DETECTION GUIDELINES:
+- DO NOT report missing styles, classes, or layout issues - these are removed intentionally
+- DO NOT report missing scripts or non-semantic attributes - these are removed intentionally
+- DO NOT report missing images or media - these are removed intentionally
+- DO focus on FUNCTIONAL issues that affect the user experience
+- DO focus on LOGICAL issues where the application doesn't behave as expected
+- DO focus on ERROR messages that appear in the content
+- DO focus on TYPOS or incorrect information that would confuse users
+
 Consider:
 1. Any error messages, exceptions, or malfunctions that appeared after the action
 2. Logical blocking - an inability to complete your directive based on steps taken and current state of the page
 3. Typos or incorrect text that indicates a problem
-4. Unexpected page states or behaviors, especially changes between BEFORE and AFTER HTML
-5. Edge cases or unusual conditions that might indicate a bug
-6. Any differences between the BEFORE and AFTER HTML that suggest unexpected behavior
+4. Unexpected page states or behaviors that affect functionality
+5. Edge cases or unusual conditions that might indicate a functional bug
+6. Any differences between the BEFORE and AFTER HTML that suggest unexpected functional behavior
 
 Avoid:
 1. Reporting a bug that is the same as an existing known bug
 2. Reporting a bug that is due to an error in the test app (such as a bad selector), and not in the target application
-3. Reporting a bug related to select options - they are omitted in the simplified page HTML on purpose, and provided on demand
-4. Reporting a bug that is highly technical - focus on the experience of the end user instead of solely technical dynamics
+3. Reporting a bug related to missing styles, scripts, or non-semantic attributes
+4. Reporting a bug that is highly technical - focus on the experience of the end user
 5. Reporting a bug based on a single failed step - a bug should only be logged after mitigating steps confirm its existence
 
 Respond ONLY with the following:
@@ -603,6 +647,15 @@ You are determining if testing should continue or if the directive has been sati
 2. If edge cases and unusual scenarios have been tested
 3. Whether the directive's requirements have been met
 4. If there are still unexplored areas based on the page changes
+
+IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
+- The HTML is SIMPLIFIED to remove noise and focus on semantic content
+- Styles, scripts, and non-essential attributes are removed
+- Hidden elements (display:none, visibility:hidden) are removed
+- Only visible, semantic content is preserved
+- This is INTENTIONAL to help you focus on functionality, not presentation
+- Missing styles, layout issues, or missing classes are NOT bugs
+- Focus on FUNCTIONALITY and USER EXPERIENCE issues
 """
 
         prompt = f"""

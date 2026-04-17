@@ -1,8 +1,8 @@
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 from lib.config import Config
 from selenium.webdriver.common.by import By
 import uuid
-
+import traceback
 
 class HTMLSimplifier:
     def __init__(self):
@@ -10,31 +10,28 @@ class HTMLSimplifier:
         self.current_token_count = 0
         self.result = []
 
-
     def get_visible_html(self, driver):
         try:
-            # First try with visibility check
+            # Try with visibility check
             result = self._get_visible_html_with_visibility(driver)
             if result and "<body>" in result and "</body>" in result and result != "<!DOCTYPE html>\n<html><body></body></html>":
                 return result
 
-            # If visibility check returns empty or error, try without visibility check
-            self.logger.warning("Visibility check returned empty result, trying without visibility check")
+            # Fallback: without visibility check
             result = self._get_visible_html_without_visibility(driver)
             if result and "<body>" in result and "</body>" in result and result != "<!DOCTYPE html>\n<html><body></body></html>":
                 return result
 
-            # If still empty, return full page source
-            self.logger.warning("Both visibility checks returned empty result, returning full page source")
+            # Final fallback: full page source
             return driver.page_source
 
         except Exception as e:
-            self.logger.error(f"Error in get_visible_html: {str(e)}")
+            print(f"Error in get_visible_html: {str(e)}")
+            traceback.print_exc()
             return driver.page_source
 
     def _get_visible_html_with_visibility(self, driver):
         try:
-            # JS visibility logic
             js_visibility_check = """
                 const el = arguments[0];
                 if (!el) return false;
@@ -62,7 +59,7 @@ class HTMLSimplifier:
                 return inViewport;
             """
 
-            # STEP 1 — Assign unique IDs to every element
+            # Assign unique IDs to every element
             elements = driver.find_elements(By.XPATH, "//*")
             element_ids = {}
             for el in elements:
@@ -76,13 +73,15 @@ class HTMLSimplifier:
                 except Exception:
                     continue
 
-            # STEP 2 — Re-read the DOM with IDs included
+            # Re-read the DOM with IDs included
             try:
                 soup = BeautifulSoup(driver.page_source, "html.parser")
-            except Exception:
+            except Exception as e:
+                print(f"Error parsing HTML: {str(e)}")
+                traceback.print_exc()
                 return "<html><body>Error processing page HTML</body></html>"
 
-            # STEP 3 — Build visibility map keyed by data-vis-id
+            # Build visibility map
             visibility = {}
             for el, uid in element_ids.items():
                 try:
@@ -91,10 +90,8 @@ class HTMLSimplifier:
                 except Exception:
                     continue
 
-            # Track processed elements to prevent duplicates
             processed_elements = set()
 
-            # STEP 4 — Recursively filter DOM with error handling
             def filter_node(node):
                 try:
                     if isinstance(node, Tag):
@@ -105,44 +102,51 @@ class HTMLSimplifier:
 
                         this_visible = visibility.get(uid, False) if uid else False
 
-                        # SPECIAL CASE: keep <select> ONLY if the select itself is visible
+                        # Keep <select> only if visible
                         if node.name == "select":
                             if this_visible:
                                 try:
-                                    selected = node.find("option", selected=True)
                                     new_select = soup.new_tag("select", **{
                                         k: v for k, v in node.attrs.items()
                                         if k != "data-vis-id"
                                     })
+                                    # Copy only selected option for brevity
+                                    selected = node.find("option", selected=True)
                                     if selected:
                                         new_option = soup.new_tag("option", selected=True)
                                         new_option.string = selected.get_text(strip=True)
                                         new_select.append(new_option)
                                     return new_select
-                                except Exception:
+                                except Exception as e:
+                                    print(f"Error processing select: {str(e)}")
+                                    traceback.print_exc()
                                     return None
-                            return None  # invisible select → drop it
+                            return None
 
-                        # Normal visibility rule: drop invisible nodes
+                        # Drop invisible nodes
                         if uid and not this_visible:
                             return None
 
-                        # Clone tag with error handling
+                        # Clone tag
                         try:
                             new_tag = soup.new_tag(node.name, **{
                                 k: v for k, v in node.attrs.items()
                                 if k != "data-vis-id"
                             })
-                        except Exception:
+                        except Exception as e:
+                            print(f"Error cloning tag: {str(e)}")
+                            traceback.print_exc()
                             return None
 
-                        # Recurse into children with error handling
+                        # Recurse into children
                         for child in node.children:
                             try:
                                 filtered = filter_node(child)
                                 if filtered:
                                     new_tag.append(filtered)
-                            except Exception:
+                            except Exception as e:
+                                print(f"Error processing child: {str(e)}")
+                                traceback.print_exc()
                                 continue
 
                         return new_tag
@@ -152,12 +156,23 @@ class HTMLSimplifier:
                         return node
 
                     return None
-                except Exception:
+                except Exception as e:
+                    print(f"Error in filter_node: {str(e)}")
+                    traceback.print_exc()
                     return None
 
-            # STEP 5 — Build final HTML document with error handling
+            # Build final HTML
             new_html = soup.new_tag("html")
+            new_head = soup.new_tag("head")
             new_body = soup.new_tag("body")
+
+            # Copy only relevant meta tags (e.g., charset, viewport)
+            if soup.head:
+                for meta in soup.head.find_all("meta"):
+                    if meta.get("charset") or meta.get("name") == "viewport":
+                        new_head.append(meta)
+
+            new_html.append(new_head)
 
             if soup.body:
                 for child in soup.body.children:
@@ -165,183 +180,120 @@ class HTMLSimplifier:
                         filtered = filter_node(child)
                         if filtered:
                             new_body.append(filtered)
-                    except Exception:
+                    except Exception as e:
+                        print(f"Error processing body child: {str(e)}")
+                        traceback.print_exc()
                         continue
 
             new_html.append(new_body)
 
             return "<!DOCTYPE html>\n" + str(new_html)
         except Exception as e:
-            self.logger.error(f"Error in _get_visible_html_with_visibility: {str(e)}")
+            print(f"Error in _get_visible_html_with_visibility: {str(e)}")
+            traceback.print_exc()
             return None
 
     def _get_visible_html_without_visibility(self, driver):
         try:
-            # STEP 1 — Re-read the DOM
-            try:
-                soup = BeautifulSoup(driver.page_source, "html.parser")
-            except Exception:
-                return "<html><body>Error processing page HTML</body></html>"
-
-            # STEP 2 — Remove script, style, and other noise tags
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+            # Remove noise tags
             for tag in soup(["script", "style", "noscript", "meta", "link", "svg", "canvas", "img", "iframe", "object", "embed"]):
                 tag.decompose()
-
+            # Keep only charset and viewport meta tags
+            if soup.head:
+                for meta in soup.head.find_all("meta"):
+                    if not (meta.get("charset") or meta.get("name") == "viewport"):
+                        meta.decompose()
             return "<!DOCTYPE html>\n" + str(soup)
         except Exception as e:
-            self.logger.error(f"Error in _get_visible_html_without_visibility: {str(e)}")
+            print(f"Error in _get_visible_html_without_visibility: {str(e)}")
+            traceback.print_exc()
             return None
 
     def simplify_html(self, html: str) -> str:
-        self.max_prompt_tokens = Config.get_max_prompt_tokens()
-        self.current_token_count = 0
-        self.result = []
+        """
+        Simplifies HTML by removing noise, comments, styling, and non-semantic classes.
+        Outputs a valid, stripped-down HTML page optimized for LLM consumption.
+        """
+        try:
+            if not html or not html.strip():
+                print("Error: Input HTML is empty or None.")
+                return "<html><body>Error: Input HTML is empty.</body></html>"
 
-        soup = BeautifulSoup(html, "html.parser")
+            soup = BeautifulSoup(html, "html.parser")
 
-        # Remove noise tags (even if visible)
-        for tag in soup([
-            "script", "style", "noscript", "meta", "link",
-            "svg", "canvas", "img", "iframe", "object", "embed"
-        ]):
-            tag.decompose()
+            # --- Step 1: Remove comments ---
+            for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+                comment.extract()
 
-        # --- Generate full CSS path for element hierarchy ---
-        def get_css_path(el):
-            if not el or not el.name or el.name == "[document]":
-                return ""
+            # --- Step 2: Remove noise tags ---
+            for tag in soup(["script", "style", "noscript", "svg", "canvas", "img", "iframe", "object", "embed"]):
+                tag.decompose()
 
-            path = []
-            for parent in el.parents:
-                if parent.name == "[document]":
-                    break
+            # --- Step 3: Keep only essential meta tags ---
+            if soup.head:
+                for meta in soup.head.find_all("meta"):
+                    if not (meta.get("charset") or meta.get("name") == "viewport"):
+                        meta.decompose()
 
-                siblings = [sib for sib in parent.children if sib.name == el.name]
-                if len(siblings) > 1:
-                    index = siblings.index(el) + 1
-                    path.append(f"{el.name}:nth-of-type({index})")
-                else:
-                    path.append(el.name)
+            # --- Step 4: Remove hidden/invisible elements ---
+            for tag in soup.find_all(True):
+                # Remove by style
+                style = tag.get("style", "").lower()
+                if "display:none" in style or "visibility:hidden" in style:
+                    tag.decompose()
+                # Remove by class
+                classes = tag.get("class", [])
+                if any(cls in ["hidden", "invisible", "zero-size"] for cls in classes):
+                    tag.decompose()
 
-                el = parent
+            # --- Step 5: Clean up attributes ---
+            for tag in soup.find_all(True):
+                attrs = dict(tag.attrs)
+                for attr in list(attrs.keys()):
+                    try:
+                        # Remove empty aria-label
+                        if attr == "aria-label" and not tag.get(attr, "").strip():
+                            del tag[attr]
+                        # Remove style attributes
+                        elif attr == "style":
+                            del tag[attr]
+                        # Remove empty or non-semantic classes
+                        elif attr == "class":
+                            classes = tag.get("class", [])
+                            # Keep only semantic classes (e.g., "error", "hidden")
+                            semantic_classes = [cls for cls in classes if cls in ["error", "hidden", "bug-section"]]
+                            if not semantic_classes:
+                                del tag[attr]
+                            else:
+                                tag["class"] = semantic_classes
+                        # Remove data-* attributes except data-label
+                        elif attr.startswith("data-") and attr != "data-label":
+                            del tag[attr]
+                        # Simplify boolean attributes (e.g., required="", selected="True" -> required, selected)
+                        elif attr in ["required", "selected", "disabled", "readonly"]:
+                            if tag.get(attr, "").lower() in ["true", ""]:
+                                tag[attr] = None  # BeautifulSoup will render as just the attribute name
+                    except Exception as e:
+                        print(f"Error processing attribute {attr}: {str(e)}")
+                        continue
 
-            path.reverse()
-            return " > ".join(path)
+            # --- Step 6: Remove empty tags (except structural ones) ---
+            for tag in soup.find_all(True):
+                if tag.name not in ["div", "span", "p", "body", "html", "head", "form", "ul", "ol", "li", "button", "label", "input", "select", "option"]:
+                    if not tag.contents and not tag.attrs:
+                        tag.decompose()
+                # Remove empty divs/spans if they have no semantic meaning
+                elif tag.name in ["div", "span"] and not tag.contents and not any(attr in tag.attrs for attr in ["id", "class", "role", "data-label"]):
+                    tag.decompose()
 
-        # --- Direct text only ---
-        def direct_text(el):
-            return "".join(
-                child.strip()
-                for child in el.children
-                if isinstance(child, NavigableString)
-            )
+            # --- Step 7: Fix duplicate DOCTYPE ---
+            html_str = str(soup)
+            html_str = html_str.replace("<!DOCTYPE html><!DOCTYPE html>", "<!DOCTYPE html>")
 
-        # --- Short selector (tag + id + classes) ---
-        def short_selector(el):
-            if el.name == "[document]":
-                return "[document]"
-
-            tag = el.name
-
-            if el.has_attr("id"):
-                return f"{tag}#{el['id']}"
-
-            classes = "".join(f".{c}" for c in el.get("class", []) if c)
-            return f"{tag}{classes}"
-
-        # --- Relevant attributes ---
-        def relevant_attrs(el):
-            attrs = []
-
-            # Inputs
-            if el.name == "input":
-                attrs.append(f"[type='{el.get('type', 'text')}']")
-                if el.get("placeholder"):
-                    attrs.append(f"[placeholder='{el['placeholder']}']")
-
-            # Buttons and links
-            elif el.name in ["button", "a"]:
-                if el.name == "button" and el.get("type"):
-                    attrs.append(f"[type='{el['type']}']")
-                if el.name == "a" and el.get("href"):
-                    attrs.append(f"[href='{el['href']}']")
-
-            # Selects
-            elif el.name == "select" and el.get("id"):
-                selected = el.find("option", selected=True)
-                if selected:
-                    return f" > option: '{selected.get_text(strip=True)}'"
-
-            # Data attributes
-            if el.get("data-label"):
-                attrs.append(f"[data-label='{el['data-label']}']")
-            if el.get("data-bs-toggle"):
-                attrs.append(f"[data-bs-toggle='{el['data-bs-toggle']}']")
-
-            return " ".join(attrs) if attrs else ""
-
-        # --- Label consolidation ---
-        def consolidate_label(el):
-            if el.name == "label" and el.get("for"):
-                input_id = el["for"]
-                input_tag = soup.find(attrs={"id": input_id})
-                if input_tag:
-                    label_text = el.get_text(strip=True)
-                    if label_text:
-                        input_tag["data-label"] = label_text
-                    return True
-            return False
-
-        # --- Process element ---
-        def process(el):
-            if isinstance(el, NavigableString):
-                return
-
-            # Consolidate labels (still useful)
-            if consolidate_label(el):
-                return
-
-            css_path = get_css_path(el)
-            sel = short_selector(el)
-            attrs = relevant_attrs(el)
-            text = direct_text(el)
-
-            # Skip empty containers
-            if el.name in ["div", "span", "li"] and not attrs and not text:
-                return
-
-            # Format the line with hierarchy information
-            if css_path:
-                line = f"{css_path} [{sel}]"
-            else:
-                line = sel
-
-            if attrs:
-                line += f" {attrs}"
-
-            if text:
-                line += f": '{text}'"
-
-            self._add_line(line + "\n")
-
-        # --- Process DOM ---
-        for el in soup.body.descendants if soup.body else soup.descendants:
-            if el.name == "option":
-                continue
-            process(el)
-            if self.current_token_count > self.max_prompt_tokens:
-                break
-
-        return "".join(self.result)
-
-    # --- Add line with token check ---
-    def _add_line(self, line):
-        line += "\n"
-        line_length = len(line)
-        if self.current_token_count + line_length > self.max_prompt_tokens:
-            if "# [TRUNCATED BY NEWT] HTML content reduced to fit token limit" not in self.result:
-                self.result.append("# [TRUNCATED BY NEWT] HTML content reduced to fit token limit")
-            return False
-        self.result.append(line)
-        self.current_token_count += line_length
-        return True
+            return html_str
+        except Exception as e:
+            print(f"Error in simplify_html: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return "<html><body>Error simplifying HTML: " + str(e) + "</body></html>"

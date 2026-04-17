@@ -1,6 +1,6 @@
 // Main JavaScript for the web testing bot application
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Initialize tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Auto-refresh for bot status via AJAX
     if (document.querySelector('.timeline')) {
-        setInterval(function() {
+        setInterval(function () {
             const botId = window.location.pathname.split('/').pop();
             fetch(`/bot/${botId}`)
                 .then(response => response.text())
@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Function to handle form submissions
-document.querySelectorAll('form').forEach(function(form) {
-    form.addEventListener('submit', function(e) {
+document.querySelectorAll('form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
         // Add loading state
         var submitBtn = form.querySelector('[type="submit"]');
         if (submitBtn) {
@@ -38,7 +38,7 @@ document.querySelectorAll('form').forEach(function(form) {
 
 // Restore scroll position on page load
 if (localStorage.getItem('scrollPosition')) {
-    setTimeout(function() {
+    setTimeout(function () {
         var mainContent = document.getElementById('mainContent');
         if (mainContent) {
             mainContent.scrollTop = parseInt(localStorage.getItem('scrollPosition'));
@@ -48,7 +48,7 @@ if (localStorage.getItem('scrollPosition')) {
 }
 
 // Save scroll position before unload (if not completed)
-window.addEventListener('beforeunload', function() {
+window.addEventListener('beforeunload', function () {
     if (!document.getElementById('testCompleteAlert')) {
         var mainContent = document.getElementById('mainContent');
         if (mainContent) {
@@ -58,7 +58,7 @@ window.addEventListener('beforeunload', function() {
 });
 
 // Self-test modal
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     var selfTestModal = document.getElementById('selfTestModal');
     if (selfTestModal) {
         selfTestModal.addEventListener('show.bs.modal', function () {
@@ -87,12 +87,36 @@ function closeFullImage() {
 }
 
 // Add event listeners to all screenshot thumbs on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const thumbs = document.querySelectorAll('.screenshot-thumb');
     thumbs.forEach(thumb => {
-        thumb.addEventListener('click', function() {
+        thumb.addEventListener('click', function () {
             const src = this.getAttribute('src');
             showFullImage(src);
         });
     });
 });
+
+function fetchFullImage(stepId) {
+    const imgElement = document.querySelector(`img[data-step-id="${stepId}"]`);
+    if (!imgElement) return;
+
+    // Show loading indicator
+    imgElement.style.opacity = 0.5;
+    imgElement.style.cursor = 'wait';
+
+    fetch(`/api/step/${stepId}/screenshot`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.full_screenshot) {
+                showFullImage(`data:image/png;base64,${data.full_screenshot}`);
+            }
+            imgElement.style.opacity = 1;
+            imgElement.style.cursor = 'pointer';
+        })
+        .catch(error => {
+            console.error('Error fetching full screenshot:', error);
+            imgElement.style.opacity = 1;
+            imgElement.style.cursor = 'pointer';
+        });
+}
