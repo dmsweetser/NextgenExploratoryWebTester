@@ -509,27 +509,36 @@ THAT'S AN ORDER, SOLDIER!
 
         newt_operation_summary = """
 NEWT BUG DETECTION SUMMARY:
-You are analyzing page changes to detect bugs. Your goal is to:
-1. Identify malfunctions, logical blocking, typos, or unexpected behaviors
-2. Focus on end-user experience rather than technical implementation details
-3. Detect issues that would impact real users of the application
-4. Avoid false positives from test infrastructure or temporary states
+You are analyzing page changes to detect REAL, CONFIRMED bugs. Your goal is to:
+1. Identify ONLY genuine malfunctions that would impact real users
+2. Focus on confirmed functional issues, not speculative problems
+3. Consider the full context of actions taken and their outcomes
+4. Avoid false positives from simplified HTML or temporary states
+5. Require multiple confirming observations before reporting a bug
 
 IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
 - The HTML is SIMPLIFIED to remove noise and focus on semantic content
-- Styles, scripts, and non-essential attributes are removed
+- Styles, scripts, and non-essential attributes are intentionally removed
 - Hidden elements (display:none, visibility:hidden) are removed
-- Only visible, semantic content is preserved
-- This is INTENTIONAL to help you focus on functionality, not presentation
-- Missing styles, layout issues, or missing classes are NOT bugs
-- Focus on FUNCTIONALITY and USER EXPERIENCE issues
+- This helps you focus on functionality, not presentation
+- Missing styles or layout issues are NOT bugs
+- Focus ONLY on confirmed functional issues
 
-You receive:
-- The testing directive (what should be tested)
-- The complete BEFORE HTML (page state before the last action)
-- The AFTER HTML (either a diff showing changes or the complete page state after the last action)
-- Steps taken to reach this state
-- Known bugs to avoid reporting duplicates
+CRITICAL BUG DETECTION RULES:
+1. YOU MUST NOT report a bug based solely on HTML appearance
+2. YOU MUST confirm any suspected issue through multiple observations
+3. YOU MUST consider the full sequence of actions leading to the state
+4. YOU MUST verify that any "blocking" is actually preventing functionality
+5. YOU MUST check if the issue persists after trying alternative approaches
+6. YOU MUST NOT report issues that could be resolved by further interaction
+7. YOU MUST prioritize bugs that would genuinely impact end users
+
+SPECIFIC GUIDELINES:
+- If you suspect an element is non-interactive, YOU MUST attempt to interact with it first
+- If you think there's logical blocking, YOU MUST try alternative paths to confirm
+- If you see error messages, YOU MUST verify they persist and affect functionality
+- If you find typos, YOU MUST confirm they appear in user-facing content
+- If you detect unexpected behavior, YOU MUST check if it's actually a bug or just unexpected but valid behavior
 """
 
         prompt = f"""
@@ -543,7 +552,7 @@ Page HTML BEFORE the most recent action (simplified):
 Page HTML AFTER the most recent action (simplified):
 {html_diff}
 
-Steps taken:
+Steps taken (with success/failure status):
 {self.get_step_text()}
 
 Known bugs:
@@ -551,45 +560,50 @@ Known bugs:
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
-IMPORTANT BUG DETECTION GUIDELINES:
-- DO NOT report missing styles, classes, or layout issues - these are removed intentionally
-- DO NOT report missing scripts or non-semantic attributes - these are removed intentionally
-- DO NOT report missing images or media - these are removed intentionally
-- DO focus on FUNCTIONAL issues that affect the user experience
-- DO focus on LOGICAL issues where the application doesn't behave as expected
-- DO focus on ERROR messages that appear in the content
-- DO focus on TYPOS or incorrect information that would confuse users
+CONTEXTUAL INFORMATION:
+- Recent failures: {self.failure_count} consecutive failures
+- Last action success: {'SUCCESS' if len(self.db.get_steps(self.bot_id)) > 0 and self.db.get_steps(self.bot_id)[-1]['success'] else 'FAILED'}
+- Current URL: {self.driver.current_url if self.driver else 'N/A'}
 
-Consider:
-1. Any error messages, exceptions, or malfunctions that appeared after the action
-2. Logical blocking - an inability to complete your directive based on steps taken and current state of the page
-3. Typos or incorrect text that indicates a problem
-4. Unexpected page states or behaviors that affect functionality
-5. Edge cases or unusual conditions that might indicate a functional bug
-6. Any differences between the BEFORE and AFTER HTML that suggest unexpected functional behavior
+CRITICAL BUG DETECTION QUESTIONS YOU MUST ANSWER:
+1. Have you attempted to interact with the element you suspect is problematic?
+2. Have you tried alternative approaches to confirm the issue isn't just a temporary state?
+3. Does this issue persist across multiple actions and page states?
+4. Would this issue genuinely impact an end user's ability to use the application?
+5. Is there any way this could be expected behavior rather than a bug?
+6. Have you confirmed this isn't already a known bug?
+7. Does this issue prevent completion of the testing directive?
 
-Avoid:
-1. Reporting a bug that is the same as an existing known bug
-2. Reporting a bug that is due to an error in the test app (such as a bad selector), and not in the target application
-3. Reporting a bug related to missing styles, scripts, or non-semantic attributes
-4. Reporting a bug that is highly technical - focus on the experience of the end user
-5. Reporting a bug based on a single failed step - a bug should only be logged after mitigating steps confirm its existence
+BUG REPORTING REQUIREMENTS:
+- You MUST provide specific, reproducible steps that demonstrate the bug
+- You MUST explain why this is a functional issue, not just a visual one
+- You MUST confirm the issue affects end users, not just the testing process
+- You MUST NOT report issues that could be resolved by further interaction
+- You MUST NOT report issues based solely on HTML appearance without functional confirmation
 
 Respond ONLY with the following:
 
 ```
 ~newt_isnewbug_start~
-True or False
+True or False - MUST be False if you haven't confirmed the bug through multiple observations
 ~newt_isnewbug_end~
 ~newt_severity_start~
-High, Medium or Low
+High, Medium or Low - ONLY if this is a confirmed bug
 ~newt_severity_end~
 ~newt_description_start~
-End user-friendly explanation of why this is a bug, with a list of end user-friendly steps to reproduce the bug. Include specific observations about what changed between BEFORE and AFTER.
+DETAILED end user-friendly explanation of the confirmed bug, including:
+1. Specific steps to reproduce (must be end-user focused)
+2. Expected behavior vs actual behavior
+3. Why this is a functional issue, not just a visual one
+4. How this impacts the user experience
+5. Evidence from multiple observations confirming the bug
 ~newt_description_end~
 ~newt_recommendation_start~
-How to fix or work around this bug
+Specific recommendations for fixing this bug, including technical details if relevant
 ~newt_recommendation_end~
+~newt_confirmation_start~
+Explain how you confirmed this bug through multiple observations or alternative approaches
+~newt_confirmation_end~
 ```
         """
 
@@ -611,26 +625,45 @@ How to fix or work around this bug
 
             self.logger.debug(f"Bot {self.bot_id} - Bug detection result: {analysis}")
             analysis_object = {
-                "is_bug": extract_line_based_content(analysis, "~newt_isnewbug_start~", "~newt_isnewbug_end~"),
+                "is_bug": extract_line_based_content(analysis, "~newt_isnewbug_start~", "~newt_isnewbug_end~").lower() == "true",
                 "severity": extract_line_based_content(analysis, "~newt_severity_start~", "~newt_severity_end~"),
                 "description": extract_line_based_content(analysis, "~newt_description_start~", "~newt_description_end~"),
                 "recommendation": extract_line_based_content(analysis, "~newt_recommendation_start~", "~newt_recommendation_end~"),
+                "confirmation": extract_line_based_content(analysis, "~newt_confirmation_start~", "~newt_confirmation_end~"),
             }
+
+            # Only return True if the bug is confirmed through multiple observations
+            if analysis_object["is_bug"]:
+                if not analysis_object["confirmation"]:
+                    self.logger.info(f"Bot {self.bot_id} - Potential bug detected but not confirmed through multiple observations")
+                    return False, analysis_object
+
             return analysis_object.get('is_bug', False), analysis_object
         except Exception as e:
             self.logger.error(f"Bot {self.bot_id} - Error in bug detection: {str(e)}")
             return False, {}
 
     def report_bug(self, action, result, context, analysis):
+        # Only report bugs that have been properly confirmed
+        if not analysis.get('confirmation'):
+            self.logger.info(f"Bot {self.bot_id} - Bug not reported: insufficient confirmation")
+            return None
+
         summary = f"NEWT Bug Detected: {analysis['description']}"
         steps = json.dumps(context['steps_taken'])
 
         try:
             bug_id = self.db.add_bug(self.bot_id, summary, steps)
-            knowledge = analysis["description"] + chr(10) + analysis["recommendation"]
+            knowledge = f"DESCRIPTION:{chr(10)}{analysis['description']}{chr(10)}{chr(10)}"
+            knowledge += f"RECOMMENDATION:{chr(10)}{analysis['recommendation']}{chr(10)}{chr(10)}"
+            knowledge += f"CONFIRMATION:{chr(10)}{analysis['confirmation']}"
             self.db.add_knowledge(bug_id, knowledge)
 
-            self.bug_reporter.send_notification(summary, knowledge, analysis.get('severity', 'medium'))
+            severity = analysis.get('severity', 'medium').lower()
+            if severity not in ['high', 'medium', 'low']:
+                severity = 'medium'
+
+            self.bug_reporter.send_notification(summary, knowledge, severity)
             return bug_id
         except Exception as e:
             self.logger.error(f"Bot {self.bot_id} - Error reporting bug: {str(e)}")
@@ -770,16 +803,12 @@ If not complete, suggest the next area to test based on the observed changes
 
     def get_step_text(self):
         steps = self.db.get_steps(self.bot_id)
-        return chr(10).join([f"Step {s['step_number']}: {s['action']}"
-                             + chr(10)
-                             + "Element: "
-                             + s['element']
-                             + chr(10)
-                             + "Friendly Description: "
-                             + s['friendly_description']
-                             + chr(10)
-                             + "Reasoning: "
-                             + s['reasoning']
-                             + chr(10)
-                             + "Success: "
-                             + ("Yes" if s['success'] else "No") for s in steps])
+        detailed_steps = []
+        for s in steps:
+            status = "SUCCESS" if s['success'] else "FAILED"
+            step_text = f"Step {s['step_number']} [{status}]: {s['action']}"
+            step_text += f"{chr(10)}  Element: {s['element']}"
+            step_text += f"{chr(10)}  Description: {s['friendly_description']}"
+            step_text += f"{chr(10)}  Reasoning: {s['reasoning']}"
+            detailed_steps.append(step_text)
+        return chr(10).join(detailed_steps)
