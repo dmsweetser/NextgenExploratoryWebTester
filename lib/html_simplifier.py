@@ -3,6 +3,7 @@ from lib.config import Config
 from selenium.webdriver.common.by import By
 import uuid
 import traceback
+import re
 
 class HTMLSimplifier:
     def __init__(self):
@@ -12,6 +13,11 @@ class HTMLSimplifier:
 
     def get_visible_html(self, driver):
         try:
+            # First check for blocking overlays
+            overlay_html = self._detect_blocking_overlay(driver)
+            if overlay_html:
+                return overlay_html
+
             # Try with visibility check
             result = self._get_visible_html_with_visibility(driver)
             if result and self._is_html_sufficiently_populated(result):
@@ -29,6 +35,101 @@ class HTMLSimplifier:
             print(f"Error in get_visible_html: {str(e)}")
             traceback.print_exc()
             return driver.page_source
+
+    def _detect_blocking_overlay(self, driver):
+        """Detect if there's a blocking overlay that prevents interaction with other elements"""
+        try:
+            # JavaScript to detect blocking overlays
+            js_script = """
+            function isBlockingOverlay(element) {
+                const style = window.getComputedStyle(element);
+                const rect = element.getBoundingClientRect();
+
+                // Check if element is positioned to block interaction
+                const isPositioned = style.position === 'fixed' ||
+                                    style.position === 'absolute' ||
+                                    style.position === 'sticky';
+
+                // Check if element covers significant area
+                const coversArea = rect.width > 50 && rect.height > 50;
+
+                // Check if element is on top of other content
+                const isOnTop = parseFloat(style.zIndex) > 0 ||
+                               (style.zIndex === 'auto' && isPositioned);
+
+                // Check if element blocks pointer events
+                const blocksInteraction = style.pointerEvents !== 'none';
+
+                // Check if element is visible
+                const isVisible = style.display !== 'none' &&
+                                 style.visibility !== 'hidden' &&
+                                 parseFloat(style.opacity) > 0.1;
+
+                // Check if element is in viewport
+                const inViewport = rect.top < window.innerHeight &&
+                                  rect.bottom > 0 &&
+                                  rect.left < window.innerWidth &&
+                                  rect.right > 0;
+
+                return isPositioned && isVisible && inViewport &&
+                       coversArea && isOnTop && blocksInteraction;
+            }
+
+            // Find all potential overlay elements
+            const potentialOverlays = [];
+            const allElements = document.querySelectorAll('*');
+
+            for (let i = 0; i < allElements.length; i++) {
+                const el = allElements[i];
+                if (isBlockingOverlay(el)) {
+                    potentialOverlays.push(el);
+                }
+            }
+
+            // Sort by z-index (highest first)
+            potentialOverlays.sort((a, b) => {
+                const aZ = parseFloat(window.getComputedStyle(a).zIndex) || 0;
+                const bZ = parseFloat(window.getComputedStyle(b).zIndex) || 0;
+                return bZ - aZ;
+            });
+
+            // Return the topmost blocking overlay if found
+            if (potentialOverlays.length > 0) {
+                const overlay = potentialOverlays[0];
+                const clone = overlay.cloneNode(true);
+
+                // Add some context about why this is considered an overlay
+                clone.setAttribute('data-newt-overlay', 'true');
+                clone.setAttribute('data-newt-overlay-reason',
+                    'Blocking overlay detected - prevents interaction with other elements');
+
+                return clone.outerHTML;
+            }
+
+            return null;
+            """
+
+            overlay_html = driver.execute_script(js_script)
+            if overlay_html:
+                # Create a simple HTML document with just the overlay
+                return f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>NEWT Overlay Detection</title>
+</head>
+<body>
+    <div data-newt-overlay-context="This overlay is blocking interaction with other page elements">
+        {overlay_html}
+    </div>
+</body>
+</html>"""
+
+            return None
+
+        except Exception as e:
+            print(f"Error detecting overlay: {str(e)}")
+            traceback.print_exc()
+            return None
 
     def _is_html_sufficiently_populated(self, html):
         """Check if HTML contains sufficient content beyond just basic structure"""
@@ -238,6 +339,10 @@ class HTMLSimplifier:
             if not html or not html.strip():
                 print("Error: Input HTML is empty or None.")
                 return "<html><body>Error: Input HTML is empty.</body></html>"
+
+            # Check if this is an overlay-only HTML
+            if 'data-newt-overlay="true"' in html:
+                return html
 
             soup = BeautifulSoup(html, "html.parser")
 
