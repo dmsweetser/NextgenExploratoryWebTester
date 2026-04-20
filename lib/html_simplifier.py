@@ -16,8 +16,8 @@ class HTMLSimplifier:
 
     def simplify_html(self, html_content: str) -> str:
         """Simplify HTML content by removing non-essential elements and attributes"""
-        if not html_content or not html_content.strip():
-            return self._create_fallback_html("Empty HTML content provided")
+        if not html_content or not isinstance(html_content, str) or not html_content.strip():
+            return self._create_fallback_html("Empty or invalid HTML content provided")
 
         try:
             # Try parsing with BeautifulSoup first
@@ -29,71 +29,117 @@ class HTMLSimplifier:
 
             # Remove script and style elements
             try:
-                for element in soup(["script", "style", "noscript", "meta", "link", "svg", "canvas", "iframe", "object", "embed"]):
-                    element.decompose()
+                for tag_name in ["script", "style", "noscript", "meta", "link", "svg", "canvas", "iframe", "object", "embed"]:
+                    try:
+                        for element in soup.find_all(tag_name):
+                            element.decompose()
+                    except Exception:
+                        continue
             except Exception as e:
                 self.logger.warning(f"Error removing scripts/styles: {str(e)}")
 
             # Remove comments
             try:
                 for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
-                    comment.extract()
+                    try:
+                        comment.extract()
+                    except Exception:
+                        continue
             except Exception as e:
                 self.logger.warning(f"Error removing comments: {str(e)}")
 
             # Remove hidden elements
             try:
-                for element in soup.find_all(attrs={"style": re.compile(r"display\s*:\s*none", re.IGNORECASE)}):
-                    element.decompose()
-                for element in soup.find_all(attrs={"style": re.compile(r"visibility\s*:\s*hidden", re.IGNORECASE)}):
-                    element.decompose()
+                # Remove elements with display:none
+                for element in soup.find_all(attrs={"style": True}):
+                    try:
+                        if re.search(r"display\s*:\s*none", element["style"], re.IGNORECASE):
+                            element.decompose()
+                    except Exception:
+                        continue
+
+                # Remove elements with visibility:hidden
+                for element in soup.find_all(attrs={"style": True}):
+                    try:
+                        if re.search(r"visibility\s*:\s*hidden", element["style"], re.IGNORECASE):
+                            element.decompose()
+                    except Exception:
+                        continue
+
+                # Remove elements with hidden attribute
                 for element in soup.find_all(attrs={"hidden": True}):
-                    element.decompose()
+                    try:
+                        element.decompose()
+                    except Exception:
+                        continue
+
+                # Remove elements with aria-hidden=true
                 for element in soup.find_all(attrs={"aria-hidden": "true"}):
-                    element.decompose()
+                    try:
+                        element.decompose()
+                    except Exception:
+                        continue
             except Exception as e:
                 self.logger.warning(f"Error removing hidden elements: {str(e)}")
 
             # Remove elements with zero size
             try:
-                for element in soup.find_all(attrs={"style": re.compile(r"width\s*:\s*0|height\s*:\s*0", re.IGNORECASE)}):
-                    element.decompose()
+                for element in soup.find_all(attrs={"style": True}):
+                    try:
+                        style = element["style"]
+                        if re.search(r"width\s*:\s*0", style, re.IGNORECASE) or re.search(r"height\s*:\s*0", style, re.IGNORECASE):
+                            element.decompose()
+                    except Exception:
+                        continue
             except Exception as e:
                 self.logger.warning(f"Error removing zero-size elements: {str(e)}")
 
             # Remove ViewState and other ASP.NET hidden inputs
             try:
                 for element in soup.find_all("input", {"type": "hidden"}):
-                    if element.get("name", "").lower() in ["__viewstate", "__eventvalidation", "__requestverificationtoken"]:
-                        element.decompose()
+                    try:
+                        name = element.get("name", "")
+                        if name and name.lower() in ["__viewstate", "__eventvalidation", "__requestverificationtoken"]:
+                            element.decompose()
+                    except Exception:
+                        continue
             except Exception as e:
                 self.logger.warning(f"Error removing ViewState inputs: {str(e)}")
 
             # Simplify attributes - keep only semantic attributes
             try:
+                keep_attrs = ["id", "class", "name", "type", "value", "href", "src", "alt", "title",
+                             "placeholder", "role", "aria-label", "aria-labelledby", "for"]
+
                 for tag in soup.find_all(True):
-                    # Keep these attributes
-                    keep_attrs = ["id", "class", "name", "type", "value", "href", "src", "alt", "title",
-                                 "placeholder", "role", "aria-label", "aria-labelledby", "for", "data-*"]
-                    attrs = dict(tag.attrs)
-                    for attr in list(attrs.keys()):
-                        if not any(attr == k or attr.startswith(k) for k in keep_attrs):
-                            del tag[attr]
+                    try:
+                        attrs = dict(tag.attrs)
+                        for attr in list(attrs.keys()):
+                            try:
+                                if not any(attr == k or (k == "data-*" and attr.startswith("data-")) for k in keep_attrs):
+                                    del tag[attr]
+                            except Exception:
+                                continue
+                    except Exception:
+                        continue
             except Exception as e:
                 self.logger.warning(f"Error simplifying attributes: {str(e)}")
 
             # Remove empty elements
             try:
-                for element in soup.find_all():
-                    if not element.contents and not element.attrs and not element.name == "br":
-                        element.decompose()
+                for element in list(soup.find_all()):
+                    try:
+                        if not element.contents and not element.attrs and element.name != "br":
+                            element.decompose()
+                    except Exception:
+                        continue
             except Exception as e:
                 self.logger.warning(f"Error removing empty elements: {str(e)}")
 
             # Get visible text content
             try:
                 visible_text = self._get_visible_text(soup)
-                if visible_text.strip():
+                if visible_text and visible_text.strip():
                     return str(soup)
                 else:
                     return self._create_fallback_html_with_partial_content(html_content, "No visible text content found")
@@ -114,118 +160,163 @@ class HTMLSimplifier:
                 if (!el) return false;
 
                 // Check computed style for visibility
-                const style = window.getComputedStyle(el);
-                if (style.display === 'none' ||
-                    style.visibility === 'hidden' ||
-                    style.opacity === '0' ||
-                    style.position === 'absolute' && style.left === '-9999px') {
+                try {
+                    const style = window.getComputedStyle(el);
+                    if (style.display === 'none' ||
+                        style.visibility === 'hidden' ||
+                        style.opacity === '0' ||
+                        (style.position === 'absolute' && style.left === '-9999px')) {
+                        return false;
+                    }
+                } catch (e) {
                     return false;
                 }
 
                 // Check if element has size
-                const rect = el.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) {
+                try {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) {
+                        return false;
+                    }
+                } catch (e) {
                     return false;
                 }
 
                 // Check if element is in viewport
-                return rect.top < window.innerHeight &&
-                       rect.bottom > 0 &&
-                       rect.left < window.innerWidth &&
-                       rect.right > 0;
+                try {
+                    const rect = el.getBoundingClientRect();
+                    return rect.top < window.innerHeight &&
+                           rect.bottom > 0 &&
+                           rect.left < window.innerWidth &&
+                           rect.right > 0;
+                } catch (e) {
+                    return false;
+                }
             }
 
             function getVisibleHtml() {
                 // Create a new document to build our result
-                const resultDoc = document.implementation.createHTMLDocument('Visible HTML');
-                const resultBody = resultDoc.body;
+                try {
+                    const resultDoc = document.implementation.createHTMLDocument('Visible HTML');
+                    const resultBody = resultDoc.body;
 
-                // Function to process and clone visible elements
-                function processElement(el, targetParent) {
-                    if (!isElementVisible(el)) {
-                        return false;
-                    }
-
-                    // Clone the element
-                    const clone = el.cloneNode(false);
-                    targetParent.appendChild(clone);
-
-                    // Process children
-                    let hasVisibleChildren = false;
-                    for (const child of el.childNodes) {
-                        if (child.nodeType === Node.ELEMENT_NODE) {
-                            if (processElement(child, clone)) {
-                                hasVisibleChildren = true;
+                    // Function to process and clone visible elements
+                    function processElement(el, targetParent) {
+                        try {
+                            if (!isElementVisible(el)) {
+                                return false;
                             }
-                        } else if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
-                            // Clone text nodes with content
-                            const textClone = resultDoc.createTextNode(child.textContent);
-                            clone.appendChild(textClone);
-                            hasVisibleChildren = true;
+
+                            // Clone the element
+                            const clone = el.cloneNode(false);
+                            targetParent.appendChild(clone);
+
+                            // Process children
+                            let hasVisibleChildren = false;
+                            for (const child of el.childNodes) {
+                                try {
+                                    if (child.nodeType === Node.ELEMENT_NODE) {
+                                        if (processElement(child, clone)) {
+                                            hasVisibleChildren = true;
+                                        }
+                                    } else if (child.nodeType === Node.TEXT_NODE && child.textContent && child.textContent.trim()) {
+                                        // Clone text nodes with content
+                                        const textClone = resultDoc.createTextNode(child.textContent);
+                                        clone.appendChild(textClone);
+                                        hasVisibleChildren = true;
+                                    }
+                                } catch (e) {
+                                    continue;
+                                }
+                            }
+
+                            // Remove empty elements (except for specific tags that can be empty)
+                            if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(el.tagName.toLowerCase())) {
+                                targetParent.removeChild(clone);
+                                return false;
+                            }
+
+                            // Preserve semantic attributes
+                            const keepAttrs = ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
+                                              'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-'];
+
+                            for (const attr of Array.from(el.attributes || [])) {
+                                try {
+                                    if (keepAttrs.some(k => attr.name === k || (k === 'data-*' && attr.name.startsWith('data-')))) {
+                                        clone.setAttribute(attr.name, attr.value);
+                                    }
+                                } catch (e) {
+                                    continue;
+                                }
+                            }
+
+                            return true;
+                        } catch (e) {
+                            return false;
                         }
                     }
 
-                    // Remove empty elements (except for specific tags that can be empty)
-                    if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(el.tagName.toLowerCase())) {
-                        targetParent.removeChild(clone);
-                        return false;
+                    // Process the body
+                    try {
+                        processElement(document.body, resultBody);
+                    } catch (e) {
+                        // Continue with fallback if processing fails
                     }
 
-                    // Preserve semantic attributes
-                    const keepAttrs = ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
-                                      'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-*'];
-
-                    for (const attr of Array.from(el.attributes)) {
-                        if (keepAttrs.some(k => attr.name === k || attr.name.startsWith('data-'))) {
-                            clone.setAttribute(attr.name, attr.value);
-                        }
+                    // If we have content, return it
+                    if (resultBody.children.length > 0) {
+                        return resultDoc.documentElement.outerHTML;
                     }
-
-                    return true;
-                }
-
-                // Process the body
-                processElement(document.body, resultBody);
-
-                // If we have content, return it
-                if (resultBody.children.length > 0) {
-                    return resultDoc.documentElement.outerHTML;
+                } catch (e) {
+                    // Continue with fallback if document creation fails
                 }
 
                 // Fallback: return simplified version of original HTML
-                const fallbackDoc = document.implementation.createHTMLDocument('Fallback HTML');
-                const fallbackBody = fallbackDoc.body;
+                try {
+                    const fallbackDoc = document.implementation.createHTMLDocument('Fallback HTML');
+                    const fallbackBody = fallbackDoc.body;
 
-                // Add basic structure
-                const structureDiv = fallbackDoc.createElement('div');
-                structureDiv.className = 'newt-fallback';
-                structureDiv.textContent = 'Basic page structure preserved for analysis';
-                fallbackBody.appendChild(structureDiv);
+                    // Add basic structure
+                    const structureDiv = fallbackDoc.createElement('div');
+                    structureDiv.className = 'newt-fallback';
+                    structureDiv.textContent = 'Basic page structure preserved for analysis';
+                    fallbackBody.appendChild(structureDiv);
 
-                // Try to extract some meaningful content
-                const extractContent = (tag) => {
-                    const elements = document.getElementsByTagName(tag);
-                    for (const el of elements) {
-                        if (el.textContent.trim()) {
-                            const clone = el.cloneNode(true);
-                            fallbackBody.appendChild(clone);
-                            return true;
+                    // Try to extract some meaningful content
+                    const extractContent = (tag) => {
+                        try {
+                            const elements = document.getElementsByTagName(tag);
+                            for (const el of elements) {
+                                try {
+                                    if (el.textContent && el.textContent.trim()) {
+                                        const clone = el.cloneNode(true);
+                                        fallbackBody.appendChild(clone);
+                                        return true;
+                                    }
+                                } catch (e) {
+                                    continue;
+                                }
+                            }
+                            return false;
+                        } catch (e) {
+                            return false;
                         }
+                    };
+
+                    // Try to extract headings, paragraphs, or links
+                    if (!extractContent('h1') && !extractContent('h2') && !extractContent('h3') &&
+                        !extractContent('p') && !extractContent('a')) {
+                        // If no content found, add a note
+                        const noteDiv = fallbackDoc.createElement('div');
+                        noteDiv.className = 'newt-note';
+                        noteDiv.textContent = 'No visible content detected';
+                        fallbackBody.appendChild(noteDiv);
                     }
-                    return false;
-                };
 
-                // Try to extract headings, paragraphs, or links
-                if (!extractContent('h1') && !extractContent('h2') && !extractContent('h3') &&
-                    !extractContent('p') && !extractContent('a')) {
-                    // If no content found, add a note
-                    const noteDiv = fallbackDoc.createElement('div');
-                    noteDiv.className = 'newt-note';
-                    noteDiv.textContent = 'No visible content detected';
-                    fallbackBody.appendChild(noteDiv);
+                    return fallbackDoc.documentElement.outerHTML;
+                } catch (e) {
+                    return "<!DOCTYPE html><html><body><div class='newt-error'>Error processing page content</div></body></html>";
                 }
-
-                return fallbackDoc.documentElement.outerHTML;
             }
 
             // Execute the function and return the result
@@ -361,53 +452,70 @@ class HTMLSimplifier:
     def _get_visible_html_with_visibility(self, driver):
         try:
             js_visibility_check = """
-                const el = arguments[0];
-                if (!el) return false;
+                try {
+                    const el = arguments[0];
+                    if (!el) return false;
 
-                let current = el;
-                while (current) {
-                    const style = window.getComputedStyle(current);
-                    if (style.display === 'none' ||
-                        style.visibility === 'hidden' ||
-                        style.opacity === '0') {
+                    let current = el;
+                    while (current) {
+                        try {
+                            const style = window.getComputedStyle(current);
+                            if (style.display === 'none' ||
+                                style.visibility === 'hidden' ||
+                                style.opacity === '0') {
+                                return false;
+                            }
+                        } catch (e) {
+                            return false;
+                        }
+                        current = current.parentElement;
+                    }
+
+                    try {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0) return false;
+
+                        const inViewport =
+                            rect.bottom > 0 &&
+                            rect.right > 0 &&
+                            rect.top < window.innerHeight &&
+                            rect.left < window.innerWidth;
+
+                        return inViewport;
+                    } catch (e) {
                         return false;
                     }
-                    current = current.parentElement;
+                } catch (e) {
+                    return false;
                 }
-
-                const rect = el.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) return false;
-
-                const inViewport =
-                    rect.bottom > 0 &&
-                    rect.right > 0 &&
-                    rect.top < window.innerHeight &&
-                    rect.left < window.innerWidth;
-
-                return inViewport;
             """
 
             # Assign unique IDs to every element
-            elements = driver.find_elements(By.XPATH, "//*")
+            try:
+                elements = driver.find_elements(By.XPATH, "//*")
+            except Exception:
+                elements = []
+
             element_ids = {}
             for el in elements:
                 try:
-                    uid = "visid_" + uuid.uuid4().hex
-                    driver.execute_script(
-                        "arguments[0].setAttribute('data-vis-id', arguments[1]);",
-                        el, uid
-                    )
-                    element_ids[el] = uid
+                    uid = "visid_" + str(uuid.uuid4()).replace('-', '')
+                    try:
+                        driver.execute_script(
+                            "arguments[0].setAttribute('data-vis-id', arguments[1]);",
+                            el, uid
+                        )
+                        element_ids[el] = uid
+                    except Exception:
+                        continue
                 except Exception:
                     continue
 
             # Re-read the DOM with IDs included
             try:
                 soup = BeautifulSoup(driver.page_source, "html.parser")
-            except Exception as e:
-                self.logger.error(f"Error parsing HTML: {str(e)}")
-                traceback.print_exc()
-                return "<html><body>Error processing page HTML</body></html>"
+            except Exception:
+                return self._create_fallback_html("Error parsing HTML content")
 
             # Build visibility map
             visibility = {}
@@ -434,20 +542,28 @@ class HTMLSimplifier:
                         if node.name == "select":
                             if this_visible:
                                 try:
-                                    new_select = soup.new_tag("select", **{
-                                        k: v for k, v in node.attrs.items()
-                                        if k != "data-vis-id"
-                                    })
+                                    new_select = soup.new_tag("select")
+                                    # Copy attributes
+                                    for attr, value in node.attrs.items():
+                                        if attr != "data-vis-id":
+                                            try:
+                                                new_select[attr] = value
+                                            except Exception:
+                                                continue
+
                                     # Copy only selected option for brevity
-                                    selected = node.find("option", selected=True)
-                                    if selected:
-                                        new_option = soup.new_tag("option", selected=True)
-                                        new_option.string = selected.get_text(strip=True)
-                                        new_select.append(new_option)
+                                    try:
+                                        selected = node.find("option", selected=True)
+                                        if selected:
+                                            new_option = soup.new_tag("option", selected=True)
+                                            if selected.string:
+                                                new_option.string = selected.string.strip()
+                                            new_select.append(new_option)
+                                    except Exception:
+                                        pass
+
                                     return new_select
-                                except Exception as e:
-                                    self.logger.error(f"Error processing select: {str(e)}")
-                                    traceback.print_exc()
+                                except Exception:
                                     return None
                             return None
 
@@ -457,13 +573,15 @@ class HTMLSimplifier:
 
                         # Clone tag
                         try:
-                            new_tag = soup.new_tag(node.name, **{
-                                k: v for k, v in node.attrs.items()
-                                if k != "data-vis-id"
-                            })
-                        except Exception as e:
-                            self.logger.error(f"Error cloning tag: {str(e)}")
-                            traceback.print_exc()
+                            new_tag = soup.new_tag(node.name)
+                            # Copy attributes
+                            for attr, value in node.attrs.items():
+                                if attr != "data-vis-id":
+                                    try:
+                                        new_tag[attr] = value
+                                    except Exception:
+                                        continue
+                        except Exception:
                             return None
 
                         # Recurse into children
@@ -472,54 +590,52 @@ class HTMLSimplifier:
                                 filtered = filter_node(child)
                                 if filtered:
                                     new_tag.append(filtered)
-                            except Exception as e:
-                                self.logger.error(f"Error processing child: {str(e)}")
-                                traceback.print_exc()
+                            except Exception:
                                 continue
 
                         return new_tag
 
                     # Keep text nodes
-                    if isinstance(node, str) and node.strip():
+                    if isinstance(node, NavigableString) and node.strip():
                         return node
 
                     return None
-                except Exception as e:
-                    self.logger.error(f"Error in filter_node: {str(e)}")
-                    traceback.print_exc()
+                except Exception:
                     return None
 
             # Build final HTML
-            new_html = soup.new_tag("html")
-            new_head = soup.new_tag("head")
-            new_body = soup.new_tag("body")
+            try:
+                new_html = soup.new_tag("html")
+                new_head = soup.new_tag("head")
+                new_body = soup.new_tag("body")
 
-            # Copy only relevant meta tags (e.g., charset, viewport)
-            if soup.head:
-                for meta in soup.head.find_all("meta"):
-                    if meta.get("charset") or meta.get("name") == "viewport":
-                        new_head.append(meta)
+                # Copy only relevant meta tags (e.g., charset, viewport)
+                if soup.head:
+                    for meta in soup.head.find_all("meta"):
+                        try:
+                            if meta.get("charset") or meta.get("name") == "viewport":
+                                new_head.append(meta)
+                        except Exception:
+                            continue
 
-            new_html.append(new_head)
+                new_html.append(new_head)
 
-            if soup.body:
-                for child in soup.body.children:
-                    try:
-                        filtered = filter_node(child)
-                        if filtered:
-                            new_body.append(filtered)
-                    except Exception as e:
-                        self.logger.error(f"Error processing body child: {str(e)}")
-                        traceback.print_exc()
-                        continue
+                if soup.body:
+                    for child in soup.body.children:
+                        try:
+                            filtered = filter_node(child)
+                            if filtered:
+                                new_body.append(filtered)
+                        except Exception:
+                            continue
 
-            new_html.append(new_body)
+                new_html.append(new_body)
 
-            return "<!DOCTYPE html>\n" + str(new_html)
-        except Exception as e:
-            self.logger.error(f"Error in _get_visible_html_with_visibility: {str(e)}")
-            traceback.print_exc()
-            return None
+                return "<!DOCTYPE html>\n" + str(new_html)
+            except Exception:
+                return self._create_fallback_html("Error building final HTML")
+        except Exception:
+            return self._create_fallback_html("Error in visibility detection")
 
     def _get_visible_html_without_visibility(self, driver):
         try:
@@ -546,15 +662,32 @@ class HTMLSimplifier:
         """Extract visible text from BeautifulSoup object"""
         try:
             # Remove elements that typically don't contain visible text
-            for element in soup(["head", "svg", "canvas", "iframe", "object", "embed"]):
-                element.decompose()
+            for tag_name in ["head", "svg", "canvas", "iframe", "object", "embed"]:
+                try:
+                    for element in soup.find_all(tag_name):
+                        element.decompose()
+                except Exception:
+                    continue
 
             # Get text and clean it up
-            text = soup.get_text()
-            lines = (line.strip() for line in text.splitlines())
-            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-            text = '\n'.join(chunk for chunk in chunks if chunk)
-            return text
+            try:
+                text = soup.get_text()
+                if not text:
+                    return ""
+            except Exception:
+                return ""
+
+            try:
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                chunks = []
+                for line in lines:
+                    try:
+                        chunks.extend([phrase.strip() for phrase in line.split("  ") if phrase.strip()])
+                    except Exception:
+                        continue
+                return '\n'.join(chunks)
+            except Exception:
+                return text.strip()
         except Exception as e:
             self.logger.warning(f"Error in _get_visible_text: {str(e)}")
             return ""
