@@ -66,7 +66,7 @@ class BotThread(threading.Thread):
                 self.failure_count += 1
 
             while not self.stop_event.is_set() and self.failure_count < self.max_failures:
-                current_html = self.html_simplifier.simplify_html(self.html_simplifier.get_visible_html(self.driver))
+                self.current_html = self.html_simplifier.simplify_html(self.html_simplifier.get_visible_html(self.driver))
                 current_url = self.driver.current_url
                 try:
                     # Check domain to prevent cross-domain navigation
@@ -81,7 +81,7 @@ class BotThread(threading.Thread):
                     context = {
                         'directive': self.directive,
                         'previous_page': self.previous_html,
-                        'current_page': self.get_html_diff(self.previous_html, current_html),
+                        'current_page': self.get_html_diff(self.previous_html, self.current_html),
                         'known_bugs': json.dumps(self.db.get_bugs(self.bot_id, False)),
                         'steps_taken': steps_taken,
                         'current_url': current_url,
@@ -109,7 +109,7 @@ class BotThread(threading.Thread):
                         self.failure_count += 1
 
                     # Update previous HTML for next iteration
-                    self.previous_html = current_html
+                    self.previous_html = self.current_html
 
                     # Check if directive is complete
                     if Config.get_allow_conclude():
