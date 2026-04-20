@@ -106,30 +106,143 @@ class HTMLSimplifier:
             return self._create_fallback_html_with_partial_content(html_content, f"Error in simplify_html: {str(e)}")
 
     def get_visible_html(self, driver) -> str:
-        """Get HTML content that represents what the user actually sees"""
+        """Get HTML content that represents what the user actually sees using JavaScript execution"""
         try:
-            # First check for blocking overlays
-            overlay_html = self._detect_blocking_overlay(driver)
-            if overlay_html:
-                return overlay_html
+            # JavaScript to extract visible HTML elements
+            js_script = """
+            function isElementVisible(el) {
+                if (!el) return false;
 
-            # Try with visibility check
-            result = self._get_visible_html_with_visibility(driver)
-            if result and self._is_html_sufficiently_populated(result):
-                return result
+                // Check computed style for visibility
+                const style = window.getComputedStyle(el);
+                if (style.display === 'none' ||
+                    style.visibility === 'hidden' ||
+                    style.opacity === '0' ||
+                    style.position === 'absolute' && style.left === '-9999px') {
+                    return false;
+                }
 
-            # Fallback: without visibility check
-            result = self._get_visible_html_without_visibility(driver)
-            if result and self._is_html_sufficiently_populated(result):
-                return result
+                // Check if element has size
+                const rect = el.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) {
+                    return false;
+                }
 
-            # Final fallback: full page source
-            return driver.page_source
+                // Check if element is in viewport
+                return rect.top < window.innerHeight &&
+                       rect.bottom > 0 &&
+                       rect.left < window.innerWidth &&
+                       rect.right > 0;
+            }
+
+            function getVisibleHtml() {
+                // Create a new document to build our result
+                const resultDoc = document.implementation.createHTMLDocument('Visible HTML');
+                const resultBody = resultDoc.body;
+
+                // Function to process and clone visible elements
+                function processElement(el, targetParent) {
+                    if (!isElementVisible(el)) {
+                        return false;
+                    }
+
+                    // Clone the element
+                    const clone = el.cloneNode(false);
+                    targetParent.appendChild(clone);
+
+                    // Process children
+                    let hasVisibleChildren = false;
+                    for (const child of el.childNodes) {
+                        if (child.nodeType === Node.ELEMENT_NODE) {
+                            if (processElement(child, clone)) {
+                                hasVisibleChildren = true;
+                            }
+                        } else if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+                            // Clone text nodes with content
+                            const textClone = resultDoc.createTextNode(child.textContent);
+                            clone.appendChild(textClone);
+                            hasVisibleChildren = true;
+                        }
+                    }
+
+                    // Remove empty elements (except for specific tags that can be empty)
+                    if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(el.tagName.toLowerCase())) {
+                        targetParent.removeChild(clone);
+                        return false;
+                    }
+
+                    // Preserve semantic attributes
+                    const keepAttrs = ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
+                                      'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-*'];
+
+                    for (const attr of Array.from(el.attributes)) {
+                        if (keepAttrs.some(k => attr.name === k || attr.name.startsWith('data-'))) {
+                            clone.setAttribute(attr.name, attr.value);
+                        }
+                    }
+
+                    return true;
+                }
+
+                // Process the body
+                processElement(document.body, resultBody);
+
+                // If we have content, return it
+                if (resultBody.children.length > 0) {
+                    return resultDoc.documentElement.outerHTML;
+                }
+
+                // Fallback: return simplified version of original HTML
+                const fallbackDoc = document.implementation.createHTMLDocument('Fallback HTML');
+                const fallbackBody = fallbackDoc.body;
+
+                // Add basic structure
+                const structureDiv = fallbackDoc.createElement('div');
+                structureDiv.className = 'newt-fallback';
+                structureDiv.textContent = 'Basic page structure preserved for analysis';
+                fallbackBody.appendChild(structureDiv);
+
+                // Try to extract some meaningful content
+                const extractContent = (tag) => {
+                    const elements = document.getElementsByTagName(tag);
+                    for (const el of elements) {
+                        if (el.textContent.trim()) {
+                            const clone = el.cloneNode(true);
+                            fallbackBody.appendChild(clone);
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                // Try to extract headings, paragraphs, or links
+                if (!extractContent('h1') && !extractContent('h2') && !extractContent('h3') &&
+                    !extractContent('p') && !extractContent('a')) {
+                    // If no content found, add a note
+                    const noteDiv = fallbackDoc.createElement('div');
+                    noteDiv.className = 'newt-note';
+                    noteDiv.textContent = 'No visible content detected';
+                    fallbackBody.appendChild(noteDiv);
+                }
+
+                return fallbackDoc.documentElement.outerHTML;
+            }
+
+            // Execute the function and return the result
+            return getVisibleHtml();
+            """
+
+            visible_html = driver.execute_script(js_script)
+            if visible_html & visible_html.trim() & visible_html != 'undefined':
+                return visible_html
+
+            # Final fallback: return simplified page source
+            return self._create_fallback_html_with_partial_content(driver.page_source, "JavaScript visibility detection failed")
 
         except Exception as e:
             self.logger.error(f"Error in get_visible_html: {str(e)}")
             traceback.print_exc()
-            return driver.page_source
+            return self._create_fallback_html_with_partial_content(driver.page_source, f"Error in JavaScript execution: {str(e)}")
 
     def _detect_blocking_overlay(self, driver):
         """Detect if there's a blocking overlay that prevents interaction with other elements"""
