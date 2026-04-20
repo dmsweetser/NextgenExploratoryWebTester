@@ -3,7 +3,6 @@ import re
 import logging
 from typing import Optional
 from lib.config import Config
-from selenium.webdriver.common.by import By
 import uuid
 import traceback
 
@@ -46,94 +45,6 @@ class HTMLSimplifier:
             except Exception as e:
                 self.logger.warning(f"Error removing comments: {str(e)}")
 
-            # Remove hidden elements
-            try:
-                # Remove elements with display:none
-                for element in soup.find_all(attrs={"style": True}):
-                    try:
-                        if re.search(r"display\s*:\s*none", element["style"], re.IGNORECASE):
-                            element.decompose()
-                    except Exception:
-                        continue
-
-                # Remove elements with visibility:hidden
-                for element in soup.find_all(attrs={"style": True}):
-                    try:
-                        if re.search(r"visibility\s*:\s*hidden", element["style"], re.IGNORECASE):
-                            element.decompose()
-                    except Exception:
-                        continue
-
-                # Remove elements with hidden attribute
-                for element in soup.find_all(attrs={"hidden": True}):
-                    try:
-                        element.decompose()
-                    except Exception:
-                        continue
-
-                # Remove elements with aria-hidden=true
-                for element in soup.find_all(attrs={"aria-hidden": "true"}):
-                    try:
-                        element.decompose()
-                    except Exception:
-                        continue
-            except Exception as e:
-                self.logger.warning(f"Error removing hidden elements: {str(e)}")
-
-            # Remove elements with zero size
-            try:
-                for element in soup.find_all(attrs={"style": True}):
-                    try:
-                        style = element["style"]
-                        if re.search(r"width\s*:\s*0", style, re.IGNORECASE) or re.search(r"height\s*:\s*0", style, re.IGNORECASE):
-                            element.decompose()
-                    except Exception:
-                        continue
-            except Exception as e:
-                self.logger.warning(f"Error removing zero-size elements: {str(e)}")
-
-            # Remove ViewState and other ASP.NET hidden inputs
-            try:
-                for element in soup.find_all("input", {"type": "hidden"}):
-                    try:
-                        name = element.get("name", "")
-                        if name and name.lower() in ["__viewstate", "__eventvalidation", "__requestverificationtoken"]:
-                            element.decompose()
-                    except Exception:
-                        continue
-            except Exception as e:
-                self.logger.warning(f"Error removing ViewState inputs: {str(e)}")
-
-            # Simplify attributes - keep only semantic attributes
-            try:
-                keep_attrs = ["id", "class", "name", "type", "value", "href", "src", "alt", "title",
-                             "placeholder", "role", "aria-label", "aria-labelledby", "for"]
-
-                for tag in soup.find_all(True):
-                    try:
-                        attrs = dict(tag.attrs)
-                        for attr in list(attrs.keys()):
-                            try:
-                                if not any(attr == k or (k == "data-*" and attr.startswith("data-")) for k in keep_attrs):
-                                    del tag[attr]
-                            except Exception:
-                                continue
-                    except Exception:
-                        continue
-            except Exception as e:
-                self.logger.warning(f"Error simplifying attributes: {str(e)}")
-
-            # Remove empty elements
-            try:
-                for element in list(soup.find_all()):
-                    try:
-                        if not element.contents and not element.attrs and element.name != "br":
-                            element.decompose()
-                    except Exception:
-                        continue
-            except Exception as e:
-                self.logger.warning(f"Error removing empty elements: {str(e)}")
-
             # Get visible text content
             try:
                 visible_text = self._get_visible_text(soup)
@@ -152,54 +63,48 @@ class HTMLSimplifier:
     def get_visible_html(self, driver) -> str:
         """Get HTML content that represents what the user actually sees using JavaScript execution"""
         try:
-            # JavaScript to extract visible HTML elements
+            # JavaScript to extract visible HTML elements prioritized by z-index
             js_script = """
-            function isElementVisible(el) {
-                if (!el) return false;
-
-                // Check computed style for visibility
-                try {
-                    const style = window.getComputedStyle(el);
-                    if (style.display === 'none' ||
-                        style.visibility === 'hidden' ||
-                        style.opacity === '0' ||
-                        (style.position === 'absolute' && style.left === '-9999px')) {
-                        return false;
-                    }
-                } catch (e) {
-                    return false;
-                }
-
-                // Check if element has size
-                try {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0) {
-                        return false;
-                    }
-                } catch (e) {
-                    return false;
-                }
-
-                // Check if element is in viewport
-                try {
-                    const rect = el.getBoundingClientRect();
-                    return rect.top < window.innerHeight &&
-                           rect.bottom > 0 &&
-                           rect.left < window.innerWidth &&
-                           rect.right > 0;
-                } catch (e) {
-                    return false;
-                }
-            }
-
             function getVisibleHtml() {
-                // Create a new document to build our result
                 try {
+                    // Create a new document to build our result
                     const resultDoc = document.implementation.createHTMLDocument('Visible HTML');
                     const resultBody = resultDoc.body;
 
-                    // Function to process and clone visible elements
-                    function processElement(el, targetParent) {
+                    // Function to determine if element is visible
+                    function isElementVisible(el) {
+                        if (!el) return false;
+
+                        // Check computed style for visibility
+                        const style = window.getComputedStyle(el);
+                        if (style.display === 'none' ||
+                            style.visibility === 'hidden' ||
+                            style.opacity === '0' ||
+                            (style.position === 'absolute' && style.left === '-9999px')) {
+                            return false;
+                        }
+
+                        // Check if element has size
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0) {
+                            return false;
+                        }
+
+                        return true;
+                    }
+
+                    // Function to get all elements sorted by z-index (highest first)
+                    function getElementsSortedByZIndex() {
+                        const allElements = Array.from(document.querySelectorAll('*'));
+                        return allElements.sort((a, b) => {
+                            const aZIndex = parseInt(window.getComputedStyle(a).zIndex) || 0;
+                            const bZIndex = parseInt(window.getComputedStyle(b).zIndex) || 0;
+                            return bZIndex - aZIndex;
+                        });
+                    }
+
+                    // Function to clone element with semantic attributes
+                    function cloneElementWithSemantics(el, targetParent) {
                         try {
                             if (!isElementVisible(el)) {
                                 return false;
@@ -209,16 +114,29 @@ class HTMLSimplifier:
                             const clone = el.cloneNode(false);
                             targetParent.appendChild(clone);
 
-                            // Process children
+                            // Preserve semantic attributes
+                            const keepAttrs = ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
+                                              'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-'];
+
+                            for (const attr of Array.from(el.attributes || [])) {
+                                try {
+                                    if (keepAttrs.some(k => attr.name === k || (k === 'data-*' && attr.name.startsWith('data-')))) {
+                                        clone.setAttribute(attr.name, attr.value);
+                                    }
+                                } catch (e) {
+                                    continue;
+                                }
+                            }
+
+                            // Clone children
                             let hasVisibleChildren = false;
                             for (const child of el.childNodes) {
                                 try {
                                     if (child.nodeType === Node.ELEMENT_NODE) {
-                                        if (processElement(child, clone)) {
+                                        if (cloneElementWithSemantics(child, clone)) {
                                             hasVisibleChildren = true;
                                         }
-                                    } else if (child.nodeType === Node.TEXT_NODE && child.textContent != "") {
-                                        // Clone text nodes with content
+                                    } else if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
                                         const textClone = resultDoc.createTextNode(child.textContent);
                                         clone.appendChild(textClone);
                                         hasVisibleChildren = true;
@@ -232,6 +150,71 @@ class HTMLSimplifier:
                             if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(el.tagName.toLowerCase())) {
                                 targetParent.removeChild(clone);
                                 return false;
+                            }
+
+                            return true;
+                        } catch (e) {
+                            return false;
+                        }
+                    }
+
+                    // Get elements sorted by z-index (highest first)
+                    const elementsByZIndex = getElementsSortedByZIndex();
+
+                    // Process elements in z-index order
+                    for (const el of elementsByZIndex) {
+                        try {
+                            // Skip if already processed as part of a parent
+                            if (el.parentNode && resultBody.contains(el.parentNode)) {
+                                continue;
+                            }
+
+                            // Clone the element and its hierarchy
+                            cloneElementWithSemantics(el, resultBody);
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+
+                    // If we have content, return it
+                    if (resultBody.children.length > 0) {
+                        return resultDoc.documentElement.outerHTML;
+                    }
+                } catch (e) {
+                    console.error("Error in getVisibleHtml:", e);
+                }
+
+                // Fallback 1: Simplified version without z-index prioritization
+                try {
+                    const fallbackDoc = document.implementation.createHTMLDocument('Fallback HTML');
+                    const fallbackBody = fallbackDoc.body;
+
+                    // Function to process elements without z-index sorting
+                    function processElement(el, targetParent) {
+                        try {
+                            if (!isElementVisible(el)) {
+                                return false;
+                            }
+
+                            const clone = el.cloneNode(false);
+                            targetParent.appendChild(clone);
+
+                            // Clone children
+                            let hasVisibleChildren = false;
+                            for (const child of el.childNodes) {
+                                try {
+                                    if (child.nodeType === Node.ELEMENT_NODE) {
+                                        if (processElement(child, clone)) {
+                                            hasVisibleChildren = true;
+                                        }
+                                    } else if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+                                        const textClone = fallbackDoc.createTextNode(child.textContent);
+                                        clone.appendChild(textClone);
+                                        hasVisibleChildren = true;
+                                    }
+                                } catch (e) {
+                                    continue;
+                                }
                             }
 
                             // Preserve semantic attributes
@@ -248,6 +231,12 @@ class HTMLSimplifier:
                                 }
                             }
 
+                            // Remove empty elements
+                            if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(el.tagName.toLowerCase())) {
+                                targetParent.removeChild(clone);
+                                return false;
+                            }
+
                             return true;
                         } catch (e) {
                             return false;
@@ -255,66 +244,17 @@ class HTMLSimplifier:
                     }
 
                     // Process the body
-                    try {
-                        processElement(document.body, resultBody);
-                    } catch (e) {
-                        // Continue with fallback if processing fails
-                    }
+                    processElement(document.body, fallbackBody);
 
-                    // If we have content, return it
-                    if (resultBody.children.length > 0) {
-                        return resultDoc.documentElement.outerHTML;
+                    if (fallbackBody.children.length > 0) {
+                        return fallbackDoc.documentElement.outerHTML;
                     }
                 } catch (e) {
-                    // Continue with fallback if document creation fails
+                    console.error("Error in fallback 1:", e);
                 }
 
-                // Fallback: return simplified version of original HTML
-                try {
-                    const fallbackDoc = document.implementation.createHTMLDocument('Fallback HTML');
-                    const fallbackBody = fallbackDoc.body;
-
-                    // Add basic structure
-                    const structureDiv = fallbackDoc.createElement('div');
-                    structureDiv.className = 'newt-fallback';
-                    structureDiv.textContent = 'Basic page structure preserved for analysis';
-                    fallbackBody.appendChild(structureDiv);
-
-                    // Try to extract some meaningful content
-                    const extractContent = (tag) => {
-                        try {
-                            const elements = document.getElementsByTagName(tag);
-                            for (const el of elements) {
-                                try {
-                                    if (el.textContent != "") {
-                                        const clone = el.cloneNode(true);
-                                        fallbackBody.appendChild(clone);
-                                        return true;
-                                    }
-                                } catch (e) {
-                                    continue;
-                                }
-                            }
-                            return false;
-                        } catch (e) {
-                            return false;
-                        }
-                    };
-
-                    // Try to extract headings, paragraphs, or links
-                    if (!extractContent('h1') && !extractContent('h2') && !extractContent('h3') &&
-                        !extractContent('p') && !extractContent('a')) {
-                        // If no content found, add a note
-                        const noteDiv = fallbackDoc.createElement('div');
-                        noteDiv.className = 'newt-note';
-                        noteDiv.textContent = 'No visible content detected';
-                        fallbackBody.appendChild(noteDiv);
-                    }
-
-                    return fallbackDoc.documentElement.outerHTML;
-                } catch (e) {
-                    return "<!DOCTYPE html><html><body><div class='newt-error'>Error processing page content</div></body></html>";
-                }
+                // Final fallback: return raw page source
+                return document.documentElement.outerHTML;
             }
 
             // Execute the function and return the result
@@ -332,133 +272,6 @@ class HTMLSimplifier:
             self.logger.error(f"Error in get_visible_html: {str(e)}")
             traceback.print_exc()
             return self._create_fallback_html_with_partial_content(driver.page_source, f"Error in JavaScript execution: {str(e)}")
-
-    def get_intercepting_element_html(self, driver, element) -> str:
-        """Get HTML of the element that intercepted the interaction and its hierarchy"""
-        try:
-            # JavaScript to get the intercepting element and its hierarchy
-            js_script = """
-            function getInterceptingElementHierarchy(targetElement) {
-                try {
-                    // Create a new document for our result
-                    const resultDoc = document.implementation.createHTMLDocument('Intercepting Element');
-                    const resultBody = resultDoc.body;
-
-                    // Function to clone element and its ancestors
-                    function cloneElementWithAncestors(el, targetParent) {
-                        try {
-                            if (!el) return false;
-
-                            // Clone the element
-                            const clone = el.cloneNode(false);
-                            targetParent.appendChild(clone);
-
-                            // Clone ancestors up to body
-                            let current = el.parentElement;
-                            const ancestors = [];
-
-                            while (current && current !== document.body && current !== document.documentElement) {
-                                ancestors.unshift(current);
-                                current = current.parentElement;
-                            }
-
-                            // Clone ancestors
-                            let parentClone = clone;
-                            for (const ancestor of ancestors) {
-                                const ancestorClone = ancestor.cloneNode(false);
-                                parentClone.appendChild(ancestorClone);
-                                parentClone = ancestorClone;
-                            }
-
-                            // Clone children
-                            for (const child of el.childNodes) {
-                                if (child.nodeType === Node.ELEMENT_NODE) {
-                                    const childClone = child.cloneNode(false);
-                                    clone.appendChild(childClone);
-
-                                    // Clone child's children
-                                    for (const grandchild of child.childNodes) {
-                                        if (grandchild.nodeType === Node.ELEMENT_NODE) {
-                                            childClone.appendChild(grandchild.cloneNode(true));
-                                        } else if (grandchild.nodeType === Node.TEXT_NODE && grandchild.textContent.trim()) {
-                                            childClone.appendChild(resultDoc.createTextNode(grandchild.textContent));
-                                        }
-                                    }
-                                } else if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
-                                    clone.appendChild(resultDoc.createTextNode(child.textContent));
-                                }
-                            }
-
-                            // Add attributes to indicate this is the intercepting element
-                            clone.setAttribute('data-newt-intercepting', 'true');
-                            clone.setAttribute('data-newt-intercepting-reason',
-                                'This element intercepted the interaction with the target element');
-
-                            return true;
-                        } catch (e) {
-                            return false;
-                        }
-                    }
-
-                    // Get the element that would intercept the click
-                    let interceptingElement = null;
-                    const rect = targetElement.getBoundingClientRect();
-
-                    // Check for elements that would intercept at the center of the target
-                    const centerX = rect.left + rect.width / 2;
-                    const centerY = rect.top + rect.height / 2;
-
-                    const elementAtPoint = document.elementFromPoint(centerX, centerY);
-                    if (elementAtPoint && elementAtPoint !== targetElement) {
-                        interceptingElement = elementAtPoint;
-                    }
-
-                    // If no intercepting element found at center, try other points
-                    if (!interceptingElement) {
-                        const points = [
-                            {x: rect.left + 5, y: rect.top + 5},
-                            {x: rect.left + rect.width - 5, y: rect.top + 5},
-                            {x: rect.left + 5, y: rect.top + rect.height - 5},
-                            {x: rect.left + rect.width - 5, y: rect.top + rect.height - 5}
-                        ];
-
-                        for (const point of points) {
-                            const el = document.elementFromPoint(point.x, point.y);
-                            if (el && el !== targetElement) {
-                                interceptingElement = el;
-                                break;
-                            }
-                        }
-                    }
-
-                    // If we found an intercepting element, clone it with hierarchy
-                    if (interceptingElement) {
-                        cloneElementWithAncestors(interceptingElement, resultBody);
-                        return resultDoc.documentElement.outerHTML;
-                    }
-
-                    return null;
-                } catch (e) {
-                    return null;
-                }
-            }
-
-            // Execute the function with the target element
-            return getInterceptingElementHierarchy(arguments[0]);
-            """
-
-            intercepting_html = driver.execute_script(js_script, element)
-            if intercepting_html:
-                # Simplify the intercepting HTML
-                simplified_html = self.simplify_html(intercepting_html)
-                return simplified_html
-
-            return None
-
-        except Exception as e:
-            self.logger.error(f"Error getting intercepting element HTML: {str(e)}")
-            traceback.print_exc()
-            return None
 
     def _get_visible_text(self, soup: BeautifulSoup) -> str:
         """Extract visible text from BeautifulSoup object"""
