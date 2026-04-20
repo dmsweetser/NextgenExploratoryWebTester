@@ -232,7 +232,7 @@ def test_website():
     return render_template('test_website.html')
 
 @app.route('/html-simplifier', methods=['GET', 'POST'])
-def html_simplifier():
+def html_simplifier_execute():
     simplified_html = None
     original_html = ""
     error = None
