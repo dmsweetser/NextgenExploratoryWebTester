@@ -110,7 +110,7 @@ def export_bug(bug_id):
     if not bug:
         return redirect(url_for('bugs'))
     steps = db.get_steps(bug['bot_id'])
-    knowledge = db.get_knowledge_for_bug(bug_id)
+    knowledge = db.get_knowledge_for_bug(bug_id).replace('\n', '<br>')
 
     # Create HTML with embedded images
     html_content = render_template('bug_report.html', bug=bug, steps=steps, knowledge=knowledge, embed_images=True)
@@ -230,6 +230,27 @@ def run_self_test():
 @app.route('/test-website')
 def test_website():
     return render_template('test_website.html')
+
+@app.route('/html-simplifier', methods=['GET', 'POST'])
+def html_simplifier():
+    simplified_html = None
+    original_html = ""
+    error = None
+
+    if request.method == 'POST':
+        original_html = request.form.get('html_content', '')
+        try:
+            html_simplifier = HTMLSimplifier()
+            simplified_html = html_simplifier.simplify_html(original_html)
+        except Exception as e:
+            error = f"Error simplifying HTML: {str(e)}"
+            logger.error(f"HTML Simplifier error: {str(e)}")
+
+    return render_template('html_simplifier.html',
+                         simplified_html=simplified_html,
+                         original_html=original_html,
+                         error=error,
+                         active_page='html_simplifier')
 
 @app.route('/api/step/<int:step_id>/screenshot')
 def get_step_screenshot(step_id):

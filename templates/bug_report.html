@@ -121,7 +121,7 @@
 
     <div class="section">
         <h2 class="section-title">Knowledge About This Bug</h2>
-        <p>{{ knowledge }}</p>
+        <div style="white-space: pre-wrap;">{{ knowledge|safe }}</div>
     </div>
 
     <div class="screenshot-full" id="screenshotFull" onclick="closeFullImage()">
