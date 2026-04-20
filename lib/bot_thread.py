@@ -36,9 +36,6 @@ class BotThread(threading.Thread):
         self.current_html = ""
         self.max_diff_lines = Config.get_max_diff_lines() if hasattr(Config, 'get_max_diff_lines') else 10
         self.restarted = False
-        self.intercepted = False
-        self.intercepting_html = ""
-        self.intercepting_action = ""
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -90,10 +87,7 @@ class BotThread(threading.Thread):
                         'current_url': current_url,
                         'select_options_cache': self.select_options_cache,
                         'recent_failures': recent_failures,
-                        'failure_count': self.failure_count,
-                        'intercepted': self.intercepted,
-                        'intercepting_html': self.intercepting_html,
-                        'intercepting_action': self.intercepting_action
+                        'failure_count': self.failure_count
                     }
 
                     action = self.get_next_action(context)
@@ -116,11 +110,6 @@ class BotThread(threading.Thread):
 
                     # Update previous HTML for next iteration
                     self.previous_html = self.current_html
-
-                    # Reset interception flags
-                    self.intercepted = False
-                    self.intercepting_html = ""
-                    self.intercepting_action = ""
 
                     # Check if directive is complete
                     if Config.get_allow_conclude():
@@ -246,21 +235,16 @@ IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
 - This is INTENTIONAL to help you focus on functionality, not presentation
 - Missing styles or layout issues are NOT bugs - focus on functionality and user experience
 
-"""
+You receive:
+- The testing directive (what you should test)
+- The BEFORE HTML (complete page state before your last action)
+- The AFTER HTML (either a diff showing changes or the complete page state after your last action)
+- Steps you've already taken
+- Known bugs to avoid
+- Current URL and select options cache
 
-        interception_info = ""
-        if context.get('intercepted', False):
-            interception_info = f"""
-PREVIOUS ACTION WAS INTERCEPTED:
-- The previous action '{context['intercepting_action']}' was intercepted by another element
-- The intercepting element HTML (simplified):{chr(10)}{context['intercepting_html']}
-- This means your intended interaction did not reach the target element
-- You MUST analyze the intercepting element and determine how to proceed
-- Consider whether you need to interact with the intercepting element first
-- Or find an alternative approach to reach your intended target
+Your output must follow the strict format provided in the prompt.
 """
-
-        newt_operation_summary += interception_info
 
         prompt = f"""
 {newt_operation_summary}
@@ -312,12 +296,12 @@ VALUE_TO_SEND (if applicable, otherwise leave empty)
 A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
 ~newt_friendly_description_end~
 ~newt_reasoning_start~
-Brief explanation of your choice, considering any previous failures, interceptions, and the changes observed between the BEFORE and AFTER HTML
+Brief explanation of your choice, considering any previous failures and the changes observed between the BEFORE and AFTER HTML
 ~newt_reasoning_end~
 ```
 
 IMPORTANT:
-1) If the previous action failed or was intercepted, choose a different approach or try a similar action with a different selector
+1) If the previous action failed, choose a different approach or try a similar action with a different selector
 2) Avoid repeating actions that have already been attempted
 3) Consider the previous bugs and steps to determine a new approach
 4) Use the appropriate Selenium action type for what you want to do
@@ -328,7 +312,6 @@ IMPORTANT:
 9) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
 10) ONLY determine your next action based on the known current page and nothing else
 11) Pay special attention to the differences between the BEFORE and AFTER HTML to understand what changed and guide your next action
-12) If the previous action was intercepted, you MUST address the intercepting element first
 
 THAT'S AN ORDER, SOLDIER!
         """
@@ -365,9 +348,6 @@ THAT'S AN ORDER, SOLDIER!
 
     def execute_action(self, action, step_number):
         try:
-            self.intercepted = False
-            self.intercepting_html = ""
-            self.intercepting_action = ""
             self.select_options_cache = {}
             if not action:
                 return {'success': False, 'screenshot': None}
@@ -401,7 +381,6 @@ THAT'S AN ORDER, SOLDIER!
             selector_value = element_selector_value
 
             action_text = f"{action_type} on {element_selector_type}:{element_selector_value}"
-            self.intercepting_action = action_text
 
             # Capture screenshot before action
             screenshot_data = None
@@ -419,23 +398,10 @@ THAT'S AN ORDER, SOLDIER!
                 if action_type == 'CLICK':
                     try:
                         element = WebDriverWait(self.driver, self.default_wait).until(
-                            EC.presence_of_element_located((selector_type, selector_value))
+                            EC.element_to_be_clickable((selector_type, selector_value))
                         )
                         self.highlight_element(element)
-
-                        # Try to click and catch interception
-                        try:
-                            element.click()
-                            self.intercepted = False
-                        except Exception as click_error:
-                            # Check if this was an interception error
-                            if "intercepted" in str(click_error).lower():
-                                self.intercepted = True
-                                self.logger.info(f"Bot {self.bot_id} - Click intercepted, getting intercepting element")
-                                self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, element)
-                            else:
-                                raise click_error
-
+                        element.click()
                         self.unhighlight_element(element)
                     except Exception as e:
                         # Fallback: try to find by CSS selector if ID selector failed
@@ -443,22 +409,10 @@ THAT'S AN ORDER, SOLDIER!
                             try:
                                 self.logger.info(f"Bot {self.bot_id} - ID selector failed, trying CSS selector")
                                 element = WebDriverWait(self.driver, self.default_wait).until(
-                                    EC.presence_of_element_located((By.CSS_SELECTOR, selector_value))
+                                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value))
                                 )
                                 self.highlight_element(element)
-
-                                # Try to click and catch interception
-                                try:
-                                    element.click()
-                                    self.intercepted = False
-                                except Exception as click_error:
-                                    if "intercepted" in str(click_error).lower():
-                                        self.intercepted = True
-                                        self.logger.info(f"Bot {self.bot_id} - Click intercepted, getting intercepting element")
-                                        self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, element)
-                                    else:
-                                        raise click_error
-
+                                element.click()
                                 self.unhighlight_element(element)
                             except Exception as e2:
                                 raise Exception(f"Failed with both ID and CSS selectors: {str(e2)}")
@@ -468,100 +422,39 @@ THAT'S AN ORDER, SOLDIER!
                     element = WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
-                    # Check for interception before sending keys
-                    try:
-                        element.clear()
-                        element.send_keys(value)
-                        self.intercepted = False
-                    except Exception as send_keys_error:
-                        if "intercepted" in str(send_keys_error).lower():
-                            self.intercepted = True
-                            self.logger.info(f"Bot {self.bot_id} - Send keys intercepted, getting intercepting element")
-                            self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, element)
-                        else:
-                            raise send_keys_error
+                    element.clear()
+                    element.send_keys(value)
                 elif action_type == 'SELECT_BY_VALUE':
                     select = Select(WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     ))
-                    # Check for interception before selecting
-                    try:
-                        select.select_by_value(value)
-                        self.intercepted = False
-                    except Exception as select_error:
-                        if "intercepted" in str(select_error).lower():
-                            self.intercepted = True
-                            self.logger.info(f"Bot {self.bot_id} - Select by value intercepted, getting intercepting element")
-                            self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, select._el)
-                        else:
-                            raise select_error
+                    select.select_by_value(value)
                 elif action_type == 'SELECT_BY_TEXT':
                     select = Select(WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     ))
-                    # Check for interception before selecting
-                    try:
-                        select.select_by_visible_text(value)
-                        self.intercepted = False
-                    except Exception as select_error:
-                        if "intercepted" in str(select_error).lower():
-                            self.intercepted = True
-                            self.logger.info(f"Bot {self.bot_id} - Select by text intercepted, getting intercepting element")
-                            self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, select._el)
-                        else:
-                            raise select_error
+                    select.select_by_visible_text(value)
                 elif action_type == 'GET_SELECT_OPTIONS':
                     select = Select(WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     ))
-                    # Check for interception before getting options
-                    try:
-                        options = [opt.text for opt in select.options]
-                        self.select_options_cache[selector_value] = options
-                        action_text = f"Got select options for {selector_value}: {', '.join(options)}"
-                        self.intercepted = False
-                    except Exception as options_error:
-                        if "intercepted" in str(options_error).lower():
-                            self.intercepted = True
-                            self.logger.info(f"Bot {self.bot_id} - Get select options intercepted, getting intercepting element")
-                            self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, select._el)
-                        else:
-                            raise options_error
+                    options = [opt.text for opt in select.options]
+                    self.select_options_cache[selector_value] = options
+                    action_text = f"Got select options for {selector_value}: {', '.join(options)}"
                 elif action_type == 'CLEAR':
                     element = WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
-                    # Check for interception before clearing
-                    try:
-                        element.clear()
-                        self.intercepted = False
-                    except Exception as clear_error:
-                        if "intercepted" in str(clear_error).lower():
-                            self.intercepted = True
-                            self.logger.info(f"Bot {self.bot_id} - Clear intercepted, getting intercepting element")
-                            self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, element)
-                        else:
-                            raise clear_error
+                    element.clear()
                 elif action_type == 'SUBMIT':
                     element = WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
-                    # Check for interception before submitting
-                    try:
-                        element.submit()
-                        self.intercepted = False
-                    except Exception as submit_error:
-                        if "intercepted" in str(submit_error).lower():
-                            self.intercepted = True
-                            self.logger.info(f"Bot {self.bot_id} - Submit intercepted, getting intercepting element")
-                            self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, element)
-                        else:
-                            raise submit_error
+                    element.submit()
                 elif action_type == 'WAIT':
                     WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
-                    self.intercepted = False
                 else:
                     raise Exception(f"Unknown action type: {action_type}")
 
@@ -578,18 +471,13 @@ THAT'S AN ORDER, SOLDIER!
                     full_screenshot_data = None
                     thumbnail_data = None
 
-                # Add interception information to the step if intercepted
-                if self.intercepted:
-                    friendly_description = f"[INTERCEPTED] {friendly_description}"
-                    reasoning = f"Action was intercepted by another element. Intercepting element HTML: {self.intercepting_html}{chr(10)}{chr(10)}{reasoning}"
-
                 self.db.add_step(self.bot_id, step_number, action_text, action['element'], {
                     'full': full_screenshot_data,
                     'thumbnail': thumbnail_data
-                }, friendly_description, reasoning, not self.intercepted)
+                }, friendly_description, reasoning)
                 self.logger.info(f"Bot {self.bot_id} step {step_number} executed: {action_text}")
 
-                return {'success': not self.intercepted, 'screenshot': full_screenshot_data}
+                return {'success': True, 'screenshot': full_screenshot_data}
 
             except Exception as e:
                 error_msg = f"Failed to execute action {action_type} on {action['element']}: {str(e)}"
@@ -652,7 +540,6 @@ SPECIFIC GUIDELINES:
 - If you see error messages, YOU MUST verify they persist and affect functionality
 - If you find typos, YOU MUST confirm they appear in user-facing content
 - If you detect unexpected behavior, YOU MUST check if it's actually a bug or just unexpected but valid behavior
-- If an action was intercepted, YOU MUST consider whether the interception itself is a bug
 """
 
         prompt = f"""
@@ -678,8 +565,6 @@ CONTEXTUAL INFORMATION:
 - Recent failures: {self.failure_count} consecutive failures
 - Last action success: {'SUCCESS' if len(self.db.get_steps(self.bot_id)) > 0 and self.db.get_steps(self.bot_id)[-1]['success'] else 'FAILED'}
 - Current URL: {self.driver.current_url if self.driver else 'N/A'}
-- Was last action intercepted: {'YES' if self.intercepted else 'NO'}
-- Intercepting action: {self.intercepting_action if self.intercepted else 'N/A'}
 
 CRITICAL BUG DETECTION QUESTIONS YOU MUST ANSWER:
 1. Have you attempted to interact with the element you suspect is problematic?
@@ -689,7 +574,6 @@ CRITICAL BUG DETECTION QUESTIONS YOU MUST ANSWER:
 5. Is there any way this could be expected behavior rather than a bug?
 6. Have you confirmed this isn't already a known bug?
 7. Does this issue prevent completion of the testing directive?
-8. If the action was intercepted, is the interception itself a bug (e.g., unexpected overlay, modal that shouldn't appear)?
 
 BUG REPORTING REQUIREMENTS:
 - You MUST provide specific, reproducible steps that demonstrate the bug
@@ -714,7 +598,6 @@ DETAILED end user-friendly explanation of the confirmed bug, including:
 3. Why this is a functional issue, not just a visual one
 4. How this impacts the user experience
 5. Evidence from multiple observations confirming the bug
-6. If applicable, information about the intercepting element and why it's problematic
 ~newt_description_end~
 ~newt_recommendation_start~
 Specific recommendations for fixing this bug, including technical details if relevant
@@ -828,11 +711,6 @@ Known bugs to avoid:
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
-CONTEXTUAL INFORMATION:
-- Recent failures: {self.failure_count} consecutive failures
-- Last action success: {'SUCCESS' if len(self.db.get_steps(self.bot_id)) > 0 and self.db.get_steps(self.bot_id)[-1]['success'] else 'FAILED'}
-- Was last action intercepted: {'YES' if self.intercepted else 'NO'}
-
 Consider:
 1. Has the directive been fully satisfied?
 2. Are there any remaining interactive elements that need testing?
@@ -840,7 +718,6 @@ Consider:
 4. Have all major functionality areas been covered?
 5. Have you tried edge cases and unusual scenarios?
 6. Based on the differences between BEFORE and AFTER HTML, are there any unexplored areas?
-7. Have you addressed any interception issues that might be blocking further testing?
 
 Respond ONLY with the following:
 
