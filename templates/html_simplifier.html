@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+
+{% block title %}HTML Simplifier{% endblock %}
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">HTML Simplifier</h1>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-code-slash"></i> HTML Simplifier Tester
+        </div>
+        <div class="card-body">
+            <p class="card-text">
+                Paste HTML content below to see how NEWT simplifies it. This tool shows what the bot actually sees when analyzing web pages.
+            </p>
+
+            {% if error %}
+            <div class="alert alert-danger">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="html_content" class="form-label">Original HTML</label>
+                    <textarea class="form-control" id="html_content" name="html_content" rows="10" required>{{ original_html }}</textarea>
+                    <div class="form-text">Paste the HTML source you want to test</div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-magic"></i> Simplify HTML
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if simplified_html %}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-file-earmark-code"></i> Original HTML</span>
+                    <span class="badge bg-primary">{{ original_html|length }} characters</span>
+                </div>
+                <div class="card-body">
+                    <div class="html-preview" style="height: 500px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: #f8f9fa;">
+                        <pre style="white-space: pre-wrap;">{{ original_html }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-eye"></i> Simplified HTML (What NEWT Sees)</span>
+                    <span class="badge bg-success">{{ simplified_html|length }} characters</span>
+                </div>
+                <div class="card-body">
+                    <div class="html-preview" style="height: 500px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: white;">
+                        <div style="white-space: pre-wrap;">{{ simplified_html|safe }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-info-circle"></i> What the Simplifier Does
+        </div>
+        <div class="card-body">
+            <p>The HTML simplifier removes non-essential elements and attributes to help NEWT focus on the semantic content of the page. This includes:</p>
+            <ul>
+                <li>Removing scripts, styles, and other non-visible elements</li>
+                <li>Removing hidden elements (display:none, visibility:hidden)</li>
+                <li>Removing non-semantic attributes</li>
+                <li>Preserving only visible, meaningful content</li>
+                <li>Keeping semantic attributes like id, class, name, href, etc.</li>
+            </ul>
+            <p>This helps NEWT focus on functionality rather than presentation, making it more effective at finding real bugs.</p>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}

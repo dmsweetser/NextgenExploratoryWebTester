@@ -28,7 +28,7 @@
                     {% for bug in bugs %}
                     <tr>
                         <td>#{{ bug['id'] }}</td>
-                        <td>{{ bug['summary'] }}</td>
+                        <td><div style="white-space: pre-wrap;">{{ bug['summary'] }}</div></td>
                         <td>{{ bug['bot_name'] }}</td>
                         <td>
                             <span
