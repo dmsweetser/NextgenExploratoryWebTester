@@ -33,6 +33,7 @@ class BotThread(threading.Thread):
         self.failure_count = 0
         self.select_options_cache = {}
         self.previous_html = ""
+        self.current_html = ""
         self.max_diff_lines = Config.get_max_diff_lines() if hasattr(Config, 'get_max_diff_lines') else 10
         self.restarted = False
 

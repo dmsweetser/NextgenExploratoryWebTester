@@ -219,7 +219,7 @@ class HTMLSimplifier:
                                         if (processElement(child, clone)) {
                                             hasVisibleChildren = true;
                                         }
-                                    } else if (child.nodeType === Node.TEXT_NODE && child.textContent && child.textContent.trim()) {
+                                    } else if (child.nodeType === Node.TEXT_NODE && child.textContent != "") {
                                         // Clone text nodes with content
                                         const textClone = resultDoc.createTextNode(child.textContent);
                                         clone.appendChild(textClone);
@@ -288,7 +288,7 @@ class HTMLSimplifier:
                             const elements = document.getElementsByTagName(tag);
                             for (const el of elements) {
                                 try {
-                                    if (el.textContent && el.textContent.trim()) {
+                                    if (el.textContent != "") {
                                         const clone = el.cloneNode(true);
                                         fallbackBody.appendChild(clone);
                                         return true;
@@ -324,7 +324,7 @@ class HTMLSimplifier:
             """
 
             visible_html = driver.execute_script(js_script)
-            if visible_html & visible_html.trim() & visible_html != 'undefined':
+            if visible_html != 'undefined':
                 return visible_html
 
             # Final fallback: return simplified page source
