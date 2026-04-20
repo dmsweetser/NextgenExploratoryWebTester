@@ -348,6 +348,8 @@ THAT'S AN ORDER, SOLDIER!
 
     def execute_action(self, action, step_number):
         try:
+            self.intercepted = False
+            self.intercepting_html = ""
             self.select_options_cache = {}
             if not action:
                 return {'success': False, 'screenshot': None}
@@ -398,10 +400,23 @@ THAT'S AN ORDER, SOLDIER!
                 if action_type == 'CLICK':
                     try:
                         element = WebDriverWait(self.driver, self.default_wait).until(
-                            EC.element_to_be_clickable((selector_type, selector_value))
+                            EC.presence_of_element_located((selector_type, selector_value))
                         )
                         self.highlight_element(element)
-                        element.click()
+
+                        # Try to click and catch interception
+                        try:
+                            element.click()
+                            self.intercepted = False
+                        except Exception as click_error:
+                            # Check if this was an interception error
+                            if "intercepted" in str(click_error).lower():
+                                self.intercepted = True
+                                self.logger.info(f"Bot {self.bot_id} - Click intercepted, getting intercepting element")
+                                self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, element)
+                            else:
+                                raise click_error
+
                         self.unhighlight_element(element)
                     except Exception as e:
                         # Fallback: try to find by CSS selector if ID selector failed
@@ -409,10 +424,22 @@ THAT'S AN ORDER, SOLDIER!
                             try:
                                 self.logger.info(f"Bot {self.bot_id} - ID selector failed, trying CSS selector")
                                 element = WebDriverWait(self.driver, self.default_wait).until(
-                                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value))
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, selector_value))
                                 )
                                 self.highlight_element(element)
-                                element.click()
+
+                                # Try to click and catch interception
+                                try:
+                                    element.click()
+                                    self.intercepted = False
+                                except Exception as click_error:
+                                    if "intercepted" in str(click_error).lower():
+                                        self.intercepted = True
+                                        self.logger.info(f"Bot {self.bot_id} - Click intercepted, getting intercepting element")
+                                        self.intercepting_html = self.html_simplifier.get_intercepting_element_html(self.driver, element)
+                                    else:
+                                        raise click_error
+
                                 self.unhighlight_element(element)
                             except Exception as e2:
                                 raise Exception(f"Failed with both ID and CSS selectors: {str(e2)}")
