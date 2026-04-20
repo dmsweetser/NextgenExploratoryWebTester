@@ -17,7 +17,7 @@ class HTMLSimplifier:
     def simplify_html(self, html_content: str) -> str:
         """Simplify HTML content by removing non-essential elements and attributes"""
         if not html_content or not isinstance(html_content, str) or not html_content.strip():
-            return self._create_fallback_html("Empty or invalid HTML content provided")
+            return self._create_fallback_html("Empty or invalid HTML content provided").replace("<", chr(10) + "<")
 
         try:
             # Try parsing with BeautifulSoup first
@@ -25,7 +25,7 @@ class HTMLSimplifier:
                 soup = BeautifulSoup(html_content, "html.parser")
             except Exception as e:
                 self.logger.warning(f"BeautifulSoup parsing failed: {str(e)}")
-                return self._create_fallback_html_with_partial_content(html_content, "BeautifulSoup parsing failed")
+                return self._create_fallback_html_with_partial_content(html_content, "BeautifulSoup parsing failed").replace("<", chr(10) + "<")
 
             # Remove script and style elements
             try:
@@ -140,16 +140,16 @@ class HTMLSimplifier:
             try:
                 visible_text = self._get_visible_text(soup)
                 if visible_text and visible_text.strip():
-                    return str(soup)
+                    return str(soup).replace("<", chr(10) + "<")
                 else:
-                    return self._create_fallback_html_with_partial_content(html_content, "No visible text content found")
+                    return self._create_fallback_html_with_partial_content(html_content, "No visible text content found").replace("<", chr(10) + "<")
             except Exception as e:
                 self.logger.warning(f"Error getting visible text: {str(e)}")
-                return self._create_fallback_html_with_partial_content(html_content, "Error getting visible text")
+                return self._create_fallback_html_with_partial_content(html_content, "Error getting visible text").replace("<", chr(10) + "<")
 
         except Exception as e:
             self.logger.error(f"Error in simplify_html: {str(e)}")
-            return self._create_fallback_html_with_partial_content(html_content, f"Error in simplify_html: {str(e)}")
+            return self._create_fallback_html_with_partial_content(html_content, f"Error in simplify_html: {str(e)}").replace("<", chr(10) + "<")
 
     def get_visible_html(self, driver) -> str:
         """Get HTML content that represents what the user actually sees using JavaScript execution"""
