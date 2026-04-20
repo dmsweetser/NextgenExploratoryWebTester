@@ -11,8 +11,6 @@ class HTMLSimplifier:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.max_prompt_tokens = Config.get_max_prompt_tokens()
-        self.current_token_count = 0
-        self.result = []
 
     def simplify_html(self, html_content: str) -> str:
         """Simplify HTML content by removing non-essential elements and attributes"""
@@ -335,326 +333,130 @@ class HTMLSimplifier:
             traceback.print_exc()
             return self._create_fallback_html_with_partial_content(driver.page_source, f"Error in JavaScript execution: {str(e)}")
 
-    def _detect_blocking_overlay(self, driver):
-        """Detect if there's a blocking overlay that prevents interaction with other elements"""
+    def get_intercepting_element_html(self, driver, element) -> str:
+        """Get HTML of the element that intercepted the interaction and its hierarchy"""
         try:
-            # JavaScript to detect blocking overlays
+            # JavaScript to get the intercepting element and its hierarchy
             js_script = """
-            function isBlockingOverlay(element) {
-                const style = window.getComputedStyle(element);
-                const rect = element.getBoundingClientRect();
-
-                // Check if element is positioned to block interaction
-                const isPositioned = style.position === 'fixed' ||
-                                    style.position === 'absolute' ||
-                                    style.position === 'sticky';
-
-                // Check if element covers significant area
-                const coversArea = rect.width > 50 && rect.height > 50;
-
-                // Check if element is on top of other content
-                const isOnTop = parseFloat(style.zIndex) > 0 ||
-                               (style.zIndex === 'auto' && isPositioned);
-
-                // Check if element blocks pointer events
-                const blocksInteraction = style.pointerEvents !== 'none';
-
-                // Check if element is visible
-                const isVisible = style.display !== 'none' &&
-                                 style.visibility !== 'hidden' &&
-                                 parseFloat(style.opacity) > 0.1;
-
-                // Check if element is in viewport
-                const inViewport = rect.top < window.innerHeight &&
-                                  rect.bottom > 0 &&
-                                  rect.left < window.innerWidth &&
-                                  rect.right > 0;
-
-                return isPositioned && isVisible && inViewport &&
-                       coversArea && isOnTop && blocksInteraction;
-            }
-
-            // Find all potential overlay elements
-            const potentialOverlays = [];
-            const allElements = document.querySelectorAll('*');
-
-            for (let i = 0; i < allElements.length; i++) {
-                const el = allElements[i];
-                if (isBlockingOverlay(el)) {
-                    potentialOverlays.push(el);
-                }
-            }
-
-            // Sort by z-index (highest first)
-            potentialOverlays.sort((a, b) => {
-                const aZ = parseFloat(window.getComputedStyle(a).zIndex) || 0;
-                const bZ = parseFloat(window.getComputedStyle(b).zIndex) || 0;
-                return bZ - aZ;
-            });
-
-            // Return the topmost blocking overlay if found
-            if (potentialOverlays.length > 0) {
-                const overlay = potentialOverlays[0];
-                const clone = overlay.cloneNode(true);
-
-                // Add some context about why this is considered an overlay
-                clone.setAttribute('data-newt-overlay', 'true');
-                clone.setAttribute('data-newt-overlay-reason',
-                    'Blocking overlay detected - prevents interaction with other elements');
-
-                return clone.outerHTML;
-            }
-
-            return null;
-            """
-
-            overlay_html = driver.execute_script(js_script)
-            if overlay_html:
-                # Create a simple HTML document with just the overlay
-                return f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>NEWT Overlay Detection</title>
-</head>
-<body>
-    <div data-newt-overlay-context="This overlay is blocking interaction with other page elements">
-        {overlay_html}
-    </div>
-</body>
-</html>"""
-
-            return None
-
-        except Exception as e:
-            self.logger.error(f"Error detecting overlay: {str(e)}")
-            traceback.print_exc()
-            return None
-
-    def _is_html_sufficiently_populated(self, html):
-        """Check if HTML contains sufficient content beyond just basic structure"""
-        if not html or "<body>" not in html or "</body>" not in html:
-            return False
-
-        # Remove basic structure and check if there's meaningful content
-        content = html.replace("<!DOCTYPE html>", "") \
-                     .replace("<html>", "") \
-                     .replace("</html>", "") \
-                     .replace("<head>", "") \
-                     .replace("</head>", "") \
-                     .replace("<body>", "") \
-                     .replace("</body>", "") \
-                     .strip()
-
-        # Count meaningful content (tags, text, etc.)
-        meaningful_content = len(content.replace(" ", "").replace("\n", "").replace("\t", ""))
-        return meaningful_content > 20  # Arbitrary threshold for meaningful content
-
-    def _get_visible_html_with_visibility(self, driver):
-        try:
-            js_visibility_check = """
+            function getInterceptingElementHierarchy(targetElement) {
                 try {
-                    const el = arguments[0];
-                    if (!el) return false;
+                    // Create a new document for our result
+                    const resultDoc = document.implementation.createHTMLDocument('Intercepting Element');
+                    const resultBody = resultDoc.body;
 
-                    let current = el;
-                    while (current) {
+                    // Function to clone element and its ancestors
+                    function cloneElementWithAncestors(el, targetParent) {
                         try {
-                            const style = window.getComputedStyle(current);
-                            if (style.display === 'none' ||
-                                style.visibility === 'hidden' ||
-                                style.opacity === '0') {
-                                return false;
+                            if (!el) return false;
+
+                            // Clone the element
+                            const clone = el.cloneNode(false);
+                            targetParent.appendChild(clone);
+
+                            // Clone ancestors up to body
+                            let current = el.parentElement;
+                            const ancestors = [];
+
+                            while (current && current !== document.body && current !== document.documentElement) {
+                                ancestors.unshift(current);
+                                current = current.parentElement;
                             }
+
+                            // Clone ancestors
+                            let parentClone = clone;
+                            for (const ancestor of ancestors) {
+                                const ancestorClone = ancestor.cloneNode(false);
+                                parentClone.appendChild(ancestorClone);
+                                parentClone = ancestorClone;
+                            }
+
+                            // Clone children
+                            for (const child of el.childNodes) {
+                                if (child.nodeType === Node.ELEMENT_NODE) {
+                                    const childClone = child.cloneNode(false);
+                                    clone.appendChild(childClone);
+
+                                    // Clone child's children
+                                    for (const grandchild of child.childNodes) {
+                                        if (grandchild.nodeType === Node.ELEMENT_NODE) {
+                                            childClone.appendChild(grandchild.cloneNode(true));
+                                        } else if (grandchild.nodeType === Node.TEXT_NODE && grandchild.textContent.trim()) {
+                                            childClone.appendChild(resultDoc.createTextNode(grandchild.textContent));
+                                        }
+                                    }
+                                } else if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+                                    clone.appendChild(resultDoc.createTextNode(child.textContent));
+                                }
+                            }
+
+                            // Add attributes to indicate this is the intercepting element
+                            clone.setAttribute('data-newt-intercepting', 'true');
+                            clone.setAttribute('data-newt-intercepting-reason',
+                                'This element intercepted the interaction with the target element');
+
+                            return true;
                         } catch (e) {
                             return false;
                         }
-                        current = current.parentElement;
                     }
 
-                    try {
-                        const rect = el.getBoundingClientRect();
-                        if (rect.width === 0 || rect.height === 0) return false;
+                    // Get the element that would intercept the click
+                    let interceptingElement = null;
+                    const rect = targetElement.getBoundingClientRect();
 
-                        const inViewport =
-                            rect.bottom > 0 &&
-                            rect.right > 0 &&
-                            rect.top < window.innerHeight &&
-                            rect.left < window.innerWidth;
+                    // Check for elements that would intercept at the center of the target
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
 
-                        return inViewport;
-                    } catch (e) {
-                        return false;
+                    const elementAtPoint = document.elementFromPoint(centerX, centerY);
+                    if (elementAtPoint && elementAtPoint !== targetElement) {
+                        interceptingElement = elementAtPoint;
                     }
+
+                    // If no intercepting element found at center, try other points
+                    if (!interceptingElement) {
+                        const points = [
+                            {x: rect.left + 5, y: rect.top + 5},
+                            {x: rect.left + rect.width - 5, y: rect.top + 5},
+                            {x: rect.left + 5, y: rect.top + rect.height - 5},
+                            {x: rect.left + rect.width - 5, y: rect.top + rect.height - 5}
+                        ];
+
+                        for (const point of points) {
+                            const el = document.elementFromPoint(point.x, point.y);
+                            if (el && el !== targetElement) {
+                                interceptingElement = el;
+                                break;
+                            }
+                        }
+                    }
+
+                    // If we found an intercepting element, clone it with hierarchy
+                    if (interceptingElement) {
+                        cloneElementWithAncestors(interceptingElement, resultBody);
+                        return resultDoc.documentElement.outerHTML;
+                    }
+
+                    return null;
                 } catch (e) {
-                    return false;
+                    return null;
                 }
+            }
+
+            // Execute the function with the target element
+            return getInterceptingElementHierarchy(arguments[0]);
             """
 
-            # Assign unique IDs to every element
-            try:
-                elements = driver.find_elements(By.XPATH, "//*")
-            except Exception:
-                elements = []
+            intercepting_html = driver.execute_script(js_script, element)
+            if intercepting_html:
+                # Simplify the intercepting HTML
+                simplified_html = self.simplify_html(intercepting_html)
+                return simplified_html
 
-            element_ids = {}
-            for el in elements:
-                try:
-                    uid = "visid_" + str(uuid.uuid4()).replace('-', '')
-                    try:
-                        driver.execute_script(
-                            "arguments[0].setAttribute('data-vis-id', arguments[1]);",
-                            el, uid
-                        )
-                        element_ids[el] = uid
-                    except Exception:
-                        continue
-                except Exception:
-                    continue
+            return None
 
-            # Re-read the DOM with IDs included
-            try:
-                soup = BeautifulSoup(driver.page_source, "html.parser")
-            except Exception:
-                return self._create_fallback_html("Error parsing HTML content")
-
-            # Build visibility map
-            visibility = {}
-            for el, uid in element_ids.items():
-                try:
-                    visible = driver.execute_script(js_visibility_check, el)
-                    visibility[uid] = visible
-                except Exception:
-                    continue
-
-            processed_elements = set()
-
-            def filter_node(node):
-                try:
-                    if isinstance(node, Tag):
-                        uid = node.get("data-vis-id", "")
-                        if uid in processed_elements:
-                            return None
-                        processed_elements.add(uid)
-
-                        this_visible = visibility.get(uid, False) if uid else False
-
-                        # Keep <select> only if visible
-                        if node.name == "select":
-                            if this_visible:
-                                try:
-                                    new_select = soup.new_tag("select")
-                                    # Copy attributes
-                                    for attr, value in node.attrs.items():
-                                        if attr != "data-vis-id":
-                                            try:
-                                                new_select[attr] = value
-                                            except Exception:
-                                                continue
-
-                                    # Copy only selected option for brevity
-                                    try:
-                                        selected = node.find("option", selected=True)
-                                        if selected:
-                                            new_option = soup.new_tag("option", selected=True)
-                                            if selected.string:
-                                                new_option.string = selected.string.strip()
-                                            new_select.append(new_option)
-                                    except Exception:
-                                        pass
-
-                                    return new_select
-                                except Exception:
-                                    return None
-                            return None
-
-                        # Drop invisible nodes
-                        if uid and not this_visible:
-                            return None
-
-                        # Clone tag
-                        try:
-                            new_tag = soup.new_tag(node.name)
-                            # Copy attributes
-                            for attr, value in node.attrs.items():
-                                if attr != "data-vis-id":
-                                    try:
-                                        new_tag[attr] = value
-                                    except Exception:
-                                        continue
-                        except Exception:
-                            return None
-
-                        # Recurse into children
-                        for child in node.children:
-                            try:
-                                filtered = filter_node(child)
-                                if filtered:
-                                    new_tag.append(filtered)
-                            except Exception:
-                                continue
-
-                        return new_tag
-
-                    # Keep text nodes
-                    if isinstance(node, NavigableString) and node.strip():
-                        return node
-
-                    return None
-                except Exception:
-                    return None
-
-            # Build final HTML
-            try:
-                new_html = soup.new_tag("html")
-                new_head = soup.new_tag("head")
-                new_body = soup.new_tag("body")
-
-                # Copy only relevant meta tags (e.g., charset, viewport)
-                if soup.head:
-                    for meta in soup.head.find_all("meta"):
-                        try:
-                            if meta.get("charset") or meta.get("name") == "viewport":
-                                new_head.append(meta)
-                        except Exception:
-                            continue
-
-                new_html.append(new_head)
-
-                if soup.body:
-                    for child in soup.body.children:
-                        try:
-                            filtered = filter_node(child)
-                            if filtered:
-                                new_body.append(filtered)
-                        except Exception:
-                            continue
-
-                new_html.append(new_body)
-
-                return "<!DOCTYPE html>\n" + str(new_html)
-            except Exception:
-                return self._create_fallback_html("Error building final HTML")
-        except Exception:
-            return self._create_fallback_html("Error in visibility detection")
-
-    def _get_visible_html_without_visibility(self, driver):
-        try:
-            soup = BeautifulSoup(driver.page_source, "html.parser")
-            # Remove noise tags
-            for tag in soup(["script", "style", "noscript", "meta", "link", "svg", "canvas", "img", "iframe", "object", "embed"]):
-                tag.decompose()
-            # Remove ViewState and other ASP.NET hidden inputs
-            for element in soup.find_all("input", {"type": "hidden"}):
-                if element.get("name", "").lower() in ["__viewstate", "__eventvalidation", "__requestverificationtoken"]:
-                    element.decompose()
-            # Keep only charset and viewport meta tags
-            if soup.head:
-                for meta in soup.head.find_all("meta"):
-                    if not (meta.get("charset") or meta.get("name") == "viewport"):
-                        meta.decompose()
-            return "<!DOCTYPE html>\n" + str(soup)
         except Exception as e:
-            self.logger.error(f"Error in _get_visible_html_without_visibility: {str(e)}")
+            self.logger.error(f"Error getting intercepting element HTML: {str(e)}")
             traceback.print_exc()
             return None
 
