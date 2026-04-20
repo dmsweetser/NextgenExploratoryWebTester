@@ -669,7 +669,7 @@ class HTMLSimplifier:
                 except Exception:
                     continue
 
-            # Get text and clean it up
+            # Get text and clean it up while preserving newlines
             try:
                 text = soup.get_text()
                 if not text:
@@ -678,14 +678,13 @@ class HTMLSimplifier:
                 return ""
 
             try:
-                lines = [line.strip() for line in text.splitlines() if line.strip()]
-                chunks = []
-                for line in lines:
-                    try:
-                        chunks.extend([phrase.strip() for phrase in line.split("  ") if phrase.strip()])
-                    except Exception:
-                        continue
-                return '\n'.join(chunks)
+                # Preserve meaningful newlines but remove excessive whitespace
+                lines = []
+                for line in text.splitlines():
+                    stripped_line = line.strip()
+                    if stripped_line:
+                        lines.append(stripped_line)
+                return '\n'.join(lines)
             except Exception:
                 return text.strip()
         except Exception as e:
