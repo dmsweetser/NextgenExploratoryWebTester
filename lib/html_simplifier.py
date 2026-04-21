@@ -40,6 +40,7 @@ class HTMLSimplifier:
                 try {
                     const resultDoc = document.implementation.createHTMLDocument('Visible HTML');
                     const resultBody = resultDoc.body;
+                    const processedElements = new Set();
 
                     function isElementVisible(el) {
                         if (!el) return false;
@@ -54,7 +55,8 @@ class HTMLSimplifier:
 
                     function cloneElementWithSemantics(el, targetParent) {
                         try {
-                            if (!isElementVisible(el)) return false;
+                            if (!isElementVisible(el) || processedElements.has(el)) return false;
+                            processedElements.add(el);
 
                             const clone = el.cloneNode(false);
                             targetParent.appendChild(clone);
@@ -100,16 +102,9 @@ class HTMLSimplifier:
                         }
                     }
 
-                    const elements = Array.from(document.querySelectorAll('*'));
-                    for (const el of elements) {
-                        try {
-                            if (!el.parentNode || !resultBody.contains(el.parentNode)) {
-                                cloneElementWithSemantics(el, resultBody);
-                            }
-                        } catch (e) {
-                            continue;
-                        }
-                    }
+                    // Process only the document body to avoid duplicate processing
+                    const body = document.body;
+                    cloneElementWithSemantics(body, resultBody);
 
                     return resultBody.children.length > 0 ? resultDoc.documentElement.outerHTML : document.documentElement.outerHTML;
                 } catch (e) {
