@@ -186,9 +186,20 @@ class HTMLSimplifier:
             soup = BeautifulSoup(html, "html.parser")
 
             # Remove duplicate html/body tags
-            for tag in soup.find_all(['html', 'body']):
-                if len(tag.find_all(['html', 'body'])) > 0:
-                    tag.unwrap()
+            html_tags = soup.find_all('html')
+            if len(html_tags) > 1:
+                # Keep only the first html tag and its contents
+                for html_tag in html_tags[1:]:
+                    html_tag.decompose()
+
+            body_tags = soup.find_all('body')
+            if len(body_tags) > 1:
+                # Keep only the first body tag and merge contents
+                first_body = body_tags[0]
+                for body_tag in body_tags[1:]:
+                    for child in body_tag.contents:
+                        first_body.append(child)
+                    body_tag.decompose()
 
             # Remove duplicate content
             seen = set()
@@ -196,7 +207,7 @@ class HTMLSimplifier:
                 # Preserve useful attributes for selectors
                 for attr in list(tag.attrs):
                     if attr not in ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
-                                  'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for']:
+                                  'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-']:
                         del tag[attr]
 
                 tag_str = str(tag)
