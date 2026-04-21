@@ -140,14 +140,22 @@ class HTMLSimplifier:
             return None
 
     def _remove_non_essential_elements(self, soup: BeautifulSoup) -> None:
-        """Remove non-essential elements from the HTML"""
+        """Remove non-essential elements from the HTML while preserving semantic structure"""
         try:
+            # Remove non-essential elements but preserve form controls and interactive elements
             for tag_name in ["script", "style", "noscript", "meta", "link", "svg", "canvas", "iframe", "object", "embed"]:
                 for element in soup.find_all(tag_name):
                     element.decompose()
 
+            # Remove comments
             for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
                 comment.extract()
+
+            # Ensure all interactive elements have useful attributes
+            for tag in soup.find_all(['a', 'button', 'input', 'select', 'textarea', 'form']):
+                if not tag.get('id') and not tag.get('class') and not tag.get('name'):
+                    # Add a temporary class to help with selection
+                    tag['class'] = ['newt-interactive']
         except Exception as e:
             self.logger.warning(f"Error removing non-essential elements: {str(e)}")
 
@@ -173,7 +181,7 @@ class HTMLSimplifier:
             return ""
 
     def _clean_html_output(self, html: str) -> str:
-        """Clean HTML output to prevent duplicate content"""
+        """Clean HTML output to prevent duplicate content and preserve useful attributes"""
         try:
             soup = BeautifulSoup(html, "html.parser")
 
@@ -185,6 +193,12 @@ class HTMLSimplifier:
             # Remove duplicate content
             seen = set()
             for tag in soup.find_all():
+                # Preserve useful attributes for selectors
+                for attr in list(tag.attrs):
+                    if attr not in ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
+                                  'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for']:
+                        del tag[attr]
+
                 tag_str = str(tag)
                 if tag_str in seen:
                     tag.decompose()

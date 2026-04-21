@@ -365,16 +365,16 @@ THAT'S AN ORDER, SOLDIER!
                 self.logger.error(error_msg)
                 return {'success': False, 'screenshot': None}
 
-            # Map selector type to Selenium By enum
+            # Map selector type to Selenium By enum with preference order
             selector_map = {
-                'CSS_SELECTOR': By.CSS_SELECTOR,
                 'ID': By.ID,
                 'NAME': By.NAME,
-                'XPATH': By.XPATH,
+                'CSS_SELECTOR': By.CSS_SELECTOR,
                 'CLASS_NAME': By.CLASS_NAME,
-                'TAG_NAME': By.TAG_NAME,
                 'LINK_TEXT': By.LINK_TEXT,
-                'PARTIAL_LINK_TEXT': By.PARTIAL_LINK_TEXT
+                'PARTIAL_LINK_TEXT': By.PARTIAL_LINK_TEXT,
+                'TAG_NAME': By.TAG_NAME,
+                'XPATH': By.XPATH
             }
 
             selector_type = selector_map.get(element_selector_type, By.CSS_SELECTOR)
