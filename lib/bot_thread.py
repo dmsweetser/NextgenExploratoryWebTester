@@ -1,3 +1,4 @@
+import random
 import threading
 import time
 import json
@@ -7,6 +8,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
 from datetime import datetime
 from lib.config import Config
 from lib.llm_integration import extract_line_based_content
@@ -36,6 +39,7 @@ class BotThread(threading.Thread):
         self.current_html = ""
         self.max_diff_lines = Config.get_max_diff_lines() if hasattr(Config, 'get_max_diff_lines') else 10
         self.restarted = False
+        self.action_chains = None
 
     def run(self):
         self.db.update_bot_status(self.bot_id, 'running', datetime.now().isoformat())
@@ -43,6 +47,7 @@ class BotThread(threading.Thread):
         try:
             self.initialize_driver()
             self.llm = self.llm_factory.create_llm()
+            self.action_chains = ActionChains(self.driver)
 
             step_number = len(self.db.get_steps(self.bot_id)) + 1
 
@@ -194,6 +199,7 @@ class BotThread(threading.Thread):
         self.driver = webdriver.Chrome(options=options)
         self.driver.set_window_size(1920, 10000)
         self.driver.implicitly_wait(10)
+        self.action_chains = ActionChains(self.driver)
 
     def get_next_action(self, context):
         steps_taken = self.db.get_steps(self.bot_id)
@@ -210,22 +216,24 @@ Available Selenium selectors:
 
 Available actions:
 1. CLICK: Click on an element
-2. SEND_KEYS: Send text to an input element
+2. SEND_KEYS: Send text to an input element (human-like typing)
 3. SELECT_BY_VALUE: Select option in dropdown by value
 4. SELECT_BY_TEXT: Select option in dropdown by text
 5. GET_SELECT_OPTIONS: Get all options for a select element
 6. CLEAR: Clear an input field
 7. SUBMIT: Submit a form
 8. WAIT: Wait for a specific element to be present
+9. SCROLL_TO: Scroll to a specific element
+10. HOVER: Hover over an element
         """
 
         newt_operation_summary = """
 NEWT OPERATION SUMMARY:
 You are an AI-driven exploratory web testing bot. Your goal is to thoroughly test web applications by:
 1. Making intelligent decisions about what actions to take based on the current page state
-2. Analyzing page content for bugs, usability issues, and unexpected behaviors
+2. Analyzing page content for REAL, FUNCTIONAL bugs that impact end users
 3. Exploring edge cases and unusual scenarios within the bounds of your directive
-4. Being curious and trying to break the system to find hidden issues
+4. Being curious and trying to find REAL issues, not test apparatus limitations
 
 IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
 - The HTML is SIMPLIFIED to remove noise and focus on semantic content
@@ -234,6 +242,23 @@ IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
 - Only visible, semantic content is preserved
 - This is INTENTIONAL to help you focus on functionality, not presentation
 - Missing styles or layout issues are NOT bugs - focus on functionality and user experience
+
+CRITICAL BUG DETECTION GUIDELINES:
+1. ONLY report bugs that would genuinely impact end users
+2. IGNORE issues related to the testing apparatus (e.g., "element not interactable" unless you've confirmed it's not a test limitation)
+3. FOCUS on functional issues like:
+   - Broken functionality that prevents task completion
+   - Logical inconsistencies in application behavior
+   - Data corruption or loss
+   - Security vulnerabilities
+   - Accessibility issues that prevent usage
+   - Unexpected behavior that would confuse users
+4. DO NOT report:
+   - Visual styling issues
+   - Missing classes or attributes in simplified HTML
+   - Temporary loading states
+   - Issues that could be resolved by further interaction
+   - Test apparatus limitations
 
 You receive:
 - The testing directive (what you should test)
@@ -296,7 +321,7 @@ VALUE_TO_SEND (if applicable, otherwise leave empty)
 A user-friendly description of what this action will do (e.g., "Click on the Show Log button")
 ~newt_friendly_description_end~
 ~newt_reasoning_start~
-Brief explanation of your choice, considering any previous failures and the changes observed between the BEFORE and AFTER HTML
+Brief explanation of your choice, considering any previous failures and the changes observed between the BEFORE and AFTER HTML. Focus on finding REAL, FUNCTIONAL bugs that impact end users.
 ~newt_reasoning_end~
 ```
 
@@ -305,13 +330,14 @@ IMPORTANT:
 2) Avoid repeating actions that have already been attempted
 3) Consider the previous bugs and steps to determine a new approach
 4) Use the appropriate Selenium action type for what you want to do
-5) For input fields, use SEND_KEYS with the value you want to send
+5) For input fields, use SEND_KEYS with the value you want to send (it will be typed human-like)
 6) For dropdowns, use SELECT_BY_VALUE or SELECT_BY_TEXT
 7) For GET_SELECT_OPTIONS, only provide the element selector and it will return the available options
 8) Be curious! Try something UNUSUAL, EDGE CASE, or POTENTIALLY BREAKING within the bounds of your directive.
-9) Your goal is to get a high score - and your score is computed by the number of unique steps taken to the power of the number of identified bugs
+9) Your goal is to find REAL bugs that impact end users, not test apparatus limitations
 10) ONLY determine your next action based on the known current page and nothing else
 11) Pay special attention to the differences between the BEFORE and AFTER HTML to understand what changed and guide your next action
+12) Focus on FUNCTIONAL issues that would genuinely impact end users
 
 THAT'S AN ORDER, SOLDIER!
         """
@@ -401,7 +427,7 @@ THAT'S AN ORDER, SOLDIER!
                             EC.element_to_be_clickable((selector_type, selector_value))
                         )
                         self.highlight_element(element)
-                        element.click()
+                        self.action_chains.move_to_element(element).click().perform()
                         self.unhighlight_element(element)
                     except Exception as e:
                         # Fallback: try to find by CSS selector if ID selector failed
@@ -412,7 +438,7 @@ THAT'S AN ORDER, SOLDIER!
                                     EC.element_to_be_clickable((By.CSS_SELECTOR, selector_value))
                                 )
                                 self.highlight_element(element)
-                                element.click()
+                                self.action_chains.move_to_element(element).click().perform()
                                 self.unhighlight_element(element)
                             except Exception as e2:
                                 raise Exception(f"Failed with both ID and CSS selectors: {str(e2)}")
@@ -422,8 +448,13 @@ THAT'S AN ORDER, SOLDIER!
                     element = WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
+                    self.highlight_element(element)
                     element.clear()
-                    element.send_keys(value)
+                    # Type like a human with small delays between keystrokes
+                    for char in value:
+                        element.send_keys(char)
+                        time.sleep(0.05 + (0.1 * random.random()))  # Random delay between keystrokes
+                    self.unhighlight_element(element)
                 elif action_type == 'SELECT_BY_VALUE':
                     select = Select(WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
@@ -445,16 +476,34 @@ THAT'S AN ORDER, SOLDIER!
                     element = WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
+                    self.highlight_element(element)
                     element.clear()
+                    self.unhighlight_element(element)
                 elif action_type == 'SUBMIT':
                     element = WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
+                    self.highlight_element(element)
                     element.submit()
+                    self.unhighlight_element(element)
                 elif action_type == 'WAIT':
                     WebDriverWait(self.driver, self.default_wait).until(
                         EC.presence_of_element_located((selector_type, selector_value))
                     )
+                elif action_type == 'SCROLL_TO':
+                    element = WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    )
+                    self.highlight_element(element)
+                    self.action_chains.scroll_to_element(element).perform()
+                    self.unhighlight_element(element)
+                elif action_type == 'HOVER':
+                    element = WebDriverWait(self.driver, self.default_wait).until(
+                        EC.presence_of_element_located((selector_type, selector_value))
+                    )
+                    self.highlight_element(element)
+                    self.action_chains.move_to_element(element).perform()
+                    self.unhighlight_element(element)
                 else:
                     raise Exception(f"Unknown action type: {action_type}")
 
@@ -510,12 +559,13 @@ THAT'S AN ORDER, SOLDIER!
 
         newt_operation_summary = """
 NEWT BUG DETECTION SUMMARY:
-You are analyzing page changes to detect REAL, CONFIRMED bugs. Your goal is to:
+You are analyzing page changes to detect REAL, FUNCTIONAL bugs that impact end users. Your goal is to:
 1. Identify ONLY genuine malfunctions that would impact real users
 2. Focus on confirmed functional issues, not speculative problems
 3. Consider the full context of actions taken and their outcomes
 4. Avoid false positives from simplified HTML or temporary states
 5. Require multiple confirming observations before reporting a bug
+6. IGNORE test apparatus limitations and focus on REAL user impact
 
 IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
 - The HTML is SIMPLIFIED to remove noise and focus on semantic content
@@ -523,23 +573,36 @@ IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
 - Hidden elements (display:none, visibility:hidden) are removed
 - This helps you focus on functionality, not presentation
 - Missing styles or layout issues are NOT bugs
-- Focus ONLY on confirmed functional issues
+- Focus ONLY on confirmed functional issues that impact end users
 
 CRITICAL BUG DETECTION RULES:
 1. YOU MUST NOT report a bug based solely on HTML appearance
 2. YOU MUST confirm any suspected issue through multiple observations
 3. YOU MUST consider the full sequence of actions leading to the state
-4. YOU MUST verify that any "blocking" is actually preventing functionality
+4. YOU MUST verify that any "blocking" is actually preventing functionality for end users
 5. YOU MUST check if the issue persists after trying alternative approaches
 6. YOU MUST NOT report issues that could be resolved by further interaction
 7. YOU MUST prioritize bugs that would genuinely impact end users
+8. YOU MUST IGNORE test apparatus limitations (e.g., "element not interactable" unless confirmed as a real issue)
+9. YOU MUST focus on functional issues that prevent task completion
 
-SPECIFIC GUIDELINES:
-- If you suspect an element is non-interactive, YOU MUST attempt to interact with it first
-- If you think there's logical blocking, YOU MUST try alternative paths to confirm
-- If you see error messages, YOU MUST verify they persist and affect functionality
-- If you find typos, YOU MUST confirm they appear in user-facing content
-- If you detect unexpected behavior, YOU MUST check if it's actually a bug or just unexpected but valid behavior
+SPECIFIC GUIDELINES FOR REAL BUGS:
+- Functional issues that prevent task completion
+- Logical inconsistencies in application behavior
+- Data corruption or loss
+- Security vulnerabilities
+- Accessibility issues that prevent usage
+- Unexpected behavior that would confuse users
+- Broken functionality that persists across multiple attempts
+
+SPECIFIC GUIDELINES FOR WHAT TO IGNORE:
+- Visual styling issues
+- Missing classes or attributes in simplified HTML
+- Temporary loading states
+- Issues that could be resolved by further interaction
+- Test apparatus limitations
+- "Element not interactable" unless confirmed as a real user-facing issue
+- Overlays or popups that are part of normal application flow
 """
 
         prompt = f"""
@@ -567,44 +630,50 @@ CONTEXTUAL INFORMATION:
 - Current URL: {self.driver.current_url if self.driver else 'N/A'}
 
 CRITICAL BUG DETECTION QUESTIONS YOU MUST ANSWER:
-1. Have you attempted to interact with the element you suspect is problematic?
-2. Have you tried alternative approaches to confirm the issue isn't just a temporary state?
+1. Have you attempted to interact with the element you suspect is problematic using multiple approaches?
+2. Have you tried alternative approaches to confirm the issue isn't just a temporary state or test limitation?
 3. Does this issue persist across multiple actions and page states?
-4. Would this issue genuinely impact an end user's ability to use the application?
+4. Would this issue genuinely impact an end user's ability to complete their task?
 5. Is there any way this could be expected behavior rather than a bug?
 6. Have you confirmed this isn't already a known bug?
-7. Does this issue prevent completion of the testing directive?
+7. Does this issue prevent completion of the testing directive for a real user?
+8. Is this a REAL, FUNCTIONAL issue that impacts end users, or just a test apparatus limitation?
 
 BUG REPORTING REQUIREMENTS:
 - You MUST provide specific, reproducible steps that demonstrate the bug
-- You MUST explain why this is a functional issue, not just a visual one
+- You MUST explain why this is a functional issue that impacts end users
 - You MUST confirm the issue affects end users, not just the testing process
 - You MUST NOT report issues that could be resolved by further interaction
-- You MUST NOT report issues based solely on HTML appearance without functional confirmation
+- You MUST NOT report test apparatus limitations
+- You MUST focus on REAL, FUNCTIONAL bugs that impact end users
 
 Respond ONLY with the following:
 
 ```
 ~newt_isnewbug_start~
-True or False - MUST be False if you haven't confirmed the bug through multiple observations
+True or False - MUST be False if you haven't confirmed the bug through multiple observations and verified it's a REAL issue impacting end users
 ~newt_isnewbug_end~
 ~newt_severity_start~
-High, Medium or Low - ONLY if this is a confirmed bug
+High, Medium or Low - ONLY if this is a confirmed bug that impacts end users
 ~newt_severity_end~
 ~newt_description_start~
 DETAILED end user-friendly explanation of the confirmed bug, including:
 1. Specific steps to reproduce (must be end-user focused)
 2. Expected behavior vs actual behavior
-3. Why this is a functional issue, not just a visual one
+3. Why this is a functional issue that impacts end users
 4. How this impacts the user experience
 5. Evidence from multiple observations confirming the bug
+6. Why this is NOT a test apparatus limitation
 ~newt_description_end~
 ~newt_recommendation_start~
 Specific recommendations for fixing this bug, including technical details if relevant
 ~newt_recommendation_end~
 ~newt_confirmation_start~
-Explain how you confirmed this bug through multiple observations or alternative approaches
+Explain how you confirmed this bug through multiple observations or alternative approaches, and why it's a REAL issue impacting end users (not a test limitation)
 ~newt_confirmation_end~
+~newt_impact_start~
+Explain specifically how this bug impacts end users and prevents them from completing their tasks
+~newt_impact_end~
 ```
         """
 
@@ -631,12 +700,13 @@ Explain how you confirmed this bug through multiple observations or alternative 
                 "description": extract_line_based_content(analysis, "~newt_description_start~", "~newt_description_end~"),
                 "recommendation": extract_line_based_content(analysis, "~newt_recommendation_start~", "~newt_recommendation_end~"),
                 "confirmation": extract_line_based_content(analysis, "~newt_confirmation_start~", "~newt_confirmation_end~"),
+                "impact": extract_line_based_content(analysis, "~newt_impact_start~", "~newt_impact_end~"),
             }
 
-            # Only return True if the bug is confirmed through multiple observations
+            # Only return True if the bug is confirmed through multiple observations and is a REAL issue
             if analysis_object["is_bug"]:
-                if not analysis_object["confirmation"]:
-                    self.logger.info(f"Bot {self.bot_id} - Potential bug detected but not confirmed through multiple observations")
+                if not analysis_object["confirmation"] or not analysis_object["impact"]:
+                    self.logger.info(f"Bot {self.bot_id} - Potential bug detected but not confirmed as a REAL issue impacting end users")
                     return False, analysis_object
 
             return analysis_object.get('is_bug', False), analysis_object
@@ -645,19 +715,20 @@ Explain how you confirmed this bug through multiple observations or alternative 
             return False, {}
 
     def report_bug(self, action, result, context, analysis):
-        # Only report bugs that have been properly confirmed
-        if not analysis.get('confirmation'):
-            self.logger.info(f"Bot {self.bot_id} - Bug not reported: insufficient confirmation")
+        # Only report bugs that have been properly confirmed as REAL issues impacting end users
+        if not analysis.get('confirmation') or not analysis.get('impact'):
+            self.logger.info(f"Bot {self.bot_id} - Bug not reported: insufficient confirmation or not a REAL issue impacting end users")
             return None
 
-        summary = f"NEWT Bug Detected: {analysis['description']}"
+        summary = f"NEWT Bug Detected: {analysis['description'][:100]}..."
         steps = json.dumps(context['steps_taken'])
 
         try:
             bug_id = self.db.add_bug(self.bot_id, summary, steps)
             knowledge = f"DESCRIPTION:{chr(10)}{analysis['description']}{chr(10)}{chr(10)}"
             knowledge += f"RECOMMENDATION:{chr(10)}{analysis['recommendation']}{chr(10)}{chr(10)}"
-            knowledge += f"CONFIRMATION:{chr(10)}{analysis['confirmation']}"
+            knowledge += f"CONFIRMATION:{chr(10)}{analysis['confirmation']}{chr(10)}{chr(10)}"
+            knowledge += f"IMPACT ON USERS:{chr(10)}{analysis['impact']}"
             self.db.add_knowledge(bug_id, knowledge)
 
             severity = analysis.get('severity', 'medium').lower()
@@ -681,6 +752,7 @@ You are determining if testing should continue or if the directive has been sati
 2. If edge cases and unusual scenarios have been tested
 3. Whether the directive's requirements have been met
 4. If there are still unexplored areas based on the page changes
+5. Whether you've found REAL, FUNCTIONAL bugs that impact end users
 
 IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
 - The HTML is SIMPLIFIED to remove noise and focus on semantic content
@@ -706,7 +778,7 @@ Page HTML AFTER the most recent action (simplified):
 Steps taken:
 {self.get_step_text()}
 
-Known bugs to avoid:
+Known bugs:
 {json.dumps(self.db.get_bugs(self.bot_id, False))}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
@@ -718,6 +790,8 @@ Consider:
 4. Have all major functionality areas been covered?
 5. Have you tried edge cases and unusual scenarios?
 6. Based on the differences between BEFORE and AFTER HTML, are there any unexplored areas?
+7. Have you found REAL, FUNCTIONAL bugs that impact end users?
+8. Is there more value in continuing to test, or have you covered the important areas?
 
 Respond ONLY with the following:
 
@@ -726,10 +800,10 @@ Respond ONLY with the following:
 True or False
 ~newt_iscomplete_end~
 ~newt_reasoning_start~
-Detailed explanation of why testing should continue or stop, including observations about what changed between BEFORE and AFTER
+Detailed explanation of why testing should continue or stop, including observations about what changed between BEFORE and AFTER. Focus on whether you've found REAL issues and whether there's more value in continuing.
 ~newt_reasoning_end~
 ~newt_nextarea_start~
-If not complete, suggest the next area to test based on the observed changes
+If not complete, suggest the next area to test based on the observed changes and what would provide the most value
 ~newt_nextarea_end~
 ```
         """
