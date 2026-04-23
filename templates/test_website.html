@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Account Portal</title>
+    <title>User Account Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -16,20 +16,10 @@
         .btn-custom {
             margin: 5px;
         }
-        .hidden-unless-hover:hover + .hidden-content {
-            display: block;
-        }
         .hidden-content {
             display: none;
-            color: red;
-        }
-        .invisible {
-            visibility: hidden;
-        }
-        .zero-size {
-            width: 0;
-            height: 0;
-            overflow: hidden;
+            color: #dc3545;
+            font-weight: bold;
         }
         .notification-overlay {
             position: fixed;
@@ -79,46 +69,88 @@
             padding: 15px;
             margin: 15px 0;
             border-radius: 5px;
-            font-family: 'Courier New', monospace;
+        }
+        .invisible {
+            visibility: hidden;
+        }
+        .zero-size {
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+        .overlay-element {
+            position: fixed;
+            top: 20%;
+            left: 20%;
+            width: 60%;
+            background-color: white;
+            padding: 20px;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1001;
+            display: none;
+        }
+        .text-error {
+            color: #dc3545;
+            text-decoration: underline;
+        }
+        .border-error {
+            border: 2px solid #dc3545 !important;
+        }
+        .outline-error {
+            outline: 2px solid #dc3545;
+        }
+        .background-error {
+            background-color: #f8d7da !important;
         }
     </style>
 </head>
 <body>
     <div class="notification-backdrop" id="notificationBackdrop"></div>
     <div class="notification-overlay" id="notificationOverlay">
-        <h4>System Notification</h4>
-        <p id="notificationText">This is an important system notification.</p>
+        <h4>System Message</h4>
+        <p id="notificationText">Your session will expire in 5 minutes. Please save your work.</p>
         <div id="notificationError" class="dynamic-error" style="display: none;">
-            ERROR: Session timeout detected. Please log in again.
+            ERROR: Session validation failed. Please try again.
         </div>
         <button class="btn btn-primary" onclick="closeNotification()">Close</button>
-        <button class="btn btn-secondary" onclick="showNotificationError()">Show Error</button>
+        <button class="btn btn-secondary" onclick="showNotificationError()">More Info</button>
+    </div>
+
+    <div class="overlay-element" id="overlayElement">
+        <h5>Additional Options</h5>
+        <div class="mb-3">
+            <label for="overlayInput" class="form-label">Enter additional information</label>
+            <input type="text" class="form-control" id="overlayInput">
+        </div>
+        <button class="btn btn-primary" onclick="closeOverlay()">Submit</button>
+        <button class="btn btn-secondary" onclick="closeOverlay()">Cancel</button>
     </div>
 
     <div class="container">
-        <h1 class="mb-4">User Account Portal</h1>
+        <h1 class="mb-4">Account Management</h1>
 
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Login</h5>
+                <h5>Authentication</h5>
             </div>
             <div class="card-body">
                 <form id="loginForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" placeholder="Enter username" required>
+                        <input type="text" class="form-control" id="username" placeholder="Enter username">
                         <div id="usernameError" class="dynamic-error">
                             Username must be at least 3 characters.
                         </div>
                         <div id="usernameWarning" style="color: #856404; background-color: #fff3cd; padding: 10px; margin-top: 10px; border-radius: 5px; display: none;">
-                            Consider using a username without special characters.
+                            Usernames with special characters may cause issues.
                         </div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" placeholder="Enter password" required>
+                        <input type="password" class="form-control" id="password" placeholder="Enter password">
                         <div id="passwordError" class="dynamic-error">
-                            Password must be at least 8 characters and contain a number.
+                            Password must be at least 8 characters.
                         </div>
                     </div>
                     <div class="mb-3">
@@ -128,33 +160,43 @@
                             Please enter a valid email address.
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Login</button>
+                    <button type="submit" class="btn btn-primary">Sign In</button>
                     <button type="button" class="btn btn-secondary" id="showErrorsBtn">Validate</button>
-                    <button type="button" class="btn btn-info" id="showOverlayBtn">System Notification</button>
+                    <button type="button" class="btn btn-info" id="showOverlayBtn">System Message</button>
                 </form>
                 <div id="formSuccess" style="color: #155724; background-color: #d4edda; padding: 10px; margin-top: 10px; border-radius: 5px; display: none;">
-                    Login successful! Redirecting...
+                    Authentication successful.
                 </div>
                 <div id="unusualError" class="unusual-pattern">
-SYSTEM ERROR: CODE 500.1234
+SYSTEM STATUS: DEGRADED
 ----------------------------------------
-The authentication service has encountered an unexpected error.
+The authentication service is currently experiencing issues.
 
 Technical details:
-- Error timestamp: [current time]
-- Affected module: AuthService
-- User impact: High
-
-Please contact support.
-                </div>
-                <div id="lowContrastError" class="low-contrast">
-                    This message might be hard to read.
-                </div>
-                <div id="delayedError" class="delayed-message dynamic-error">
-                    This error appeared after a delay.
+- Service: AuthService
+- Status: Degraded
+- Impact: Some users may experience delays
+                    </div>
+                    <div id="lowContrastError" class="low-contrast">
+                        This message might be difficult to read.
+                    </div>
+                    <div id="delayedError" class="delayed-message dynamic-error">
+                        This error appeared after a delay.
+                    </div>
+                    <div id="textError" class="text-error" style="margin-top: 10px;">
+                        This text has error styling.
+                    </div>
+                    <div id="borderError" class="border-error" style="margin-top: 10px; padding: 10px;">
+                        This element has an error border.
+                    </div>
+                    <div id="outlineError" class="outline-error" style="margin-top: 10px; padding: 10px;">
+                        This element has an error outline.
+                    </div>
+                    <div id="backgroundError" class="background-error" style="margin-top: 10px; padding: 10px;">
+                        This element has an error background.
+                    </div>
                 </div>
             </div>
-        </div>
 
         <div class="card mb-4">
             <div class="card-header">
@@ -166,22 +208,19 @@ Please contact support.
                         Select an option
                     </button>
                     <div class="dropdown-menu">
-                        <a class="dropdown-item" href="#">Profile</a>
-                        <a class="dropdown-item" href="#">Security</a>
+                        <a class="dropdown-item" href="#">Profile Settings</a>
+                        <a class="dropdown-item" href="#">Security Options</a>
                         <a class="dropdown-item" href="#">Preferences</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="#" id="brokenLink">Account History</a>
                         <a class="dropdown-item" href="#" id="errorLink">Delete Account</a>
                     </div>
                 </div>
-                <div class="hidden-unless-hover" style="padding: 10px; background: #eee;">
-                    Hover over this area
-                </div>
                 <div class="hidden-content">
-                    <div class="dynamic-error">This error only appears on hover!</div>
+                    <div class="dynamic-error">This content only appears on hover!</div>
                 </div>
                 <div id="dropdownError" class="dynamic-error" style="display: none; margin-top: 10px;">
-                    This action is not allowed for your account type.
+                    This action is not available for your account type.
                 </div>
                 <div class="invisible">
                     This should not be visible
@@ -189,6 +228,7 @@ Please contact support.
                 <div class="zero-size">
                     This should not be visible either
                 </div>
+                <button type="button" class="btn btn-info" id="showOverlayElementBtn">Show Options</button>
             </div>
         </div>
 
@@ -239,7 +279,7 @@ Please contact support.
                     </div>
                     <button type="button" class="btn btn-primary" id="updateSelectBtn">Update Options</button>
                     <button type="submit" class="btn btn-secondary">Save Preferences</button>
-                    <button type="button" class="btn btn-danger" id="showDelayedErrorBtn">Test Delayed Error</button>
+                    <button type="button" class="btn btn-danger" id="showDelayedErrorBtn">Test Delay</button>
                 </form>
             </div>
         </div>
@@ -287,7 +327,7 @@ Please contact support.
                 document.getElementById('usernameWarning').style.display = 'block';
             }
 
-            if (!password || password.length < 8 || !/\d/.test(password)) {
+            if (!password || password.length < 8) {
                 document.getElementById('passwordError').style.display = 'block';
                 isValid = false;
             }
@@ -315,6 +355,7 @@ Please contact support.
             document.getElementById('passwordError').style.display = 'block';
             document.getElementById('emailError').style.display = 'block';
             document.getElementById('lowContrastError').style.display = 'block';
+            document.getElementById('textError').style.display = 'block';
         });
 
         document.getElementById('showOverlayBtn').addEventListener('click', function() {
@@ -416,6 +457,15 @@ Please contact support.
             e.preventDefault();
             document.getElementById('dropdownError').style.display = 'block';
         });
+
+        // Overlay element
+        document.getElementById('showOverlayElementBtn').addEventListener('click', function() {
+            document.getElementById('overlayElement').style.display = 'block';
+        });
+
+        function closeOverlay() {
+            document.getElementById('overlayElement').style.display = 'none';
+        }
     </script>
 </body>
 </html>

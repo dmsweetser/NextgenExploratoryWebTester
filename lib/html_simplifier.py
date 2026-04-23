@@ -68,7 +68,9 @@ class HTMLSimplifier:
                             'boxShadow': style.boxShadow,
                             'opacity': style.opacity,
                             'visibility': style.visibility,
-                            'display': style.display
+                            'display': style.display,
+                            'textDecoration': style.textDecoration,
+                            'outline': style.outline
                         };
 
                         // Check if color is red (common for error messages)
@@ -80,15 +82,25 @@ class HTMLSimplifier:
                                 const g = parseInt(rgb[1]);
                                 const b = parseInt(rgb[2]);
                                 importantStyles.isRed = (r > 200 && g < 100 && b < 100);
+                                importantStyles.isErrorColor = (r > 200 && g < 100 && b < 100) ||
+                                                              (r > 150 && g < 50 && b < 50);
                             }
                         }
 
                         // Check if element is likely an overlay
                         importantStyles.isOverlay = false;
-                        if (style.position === 'fixed' || style.position === 'absolute') {
-                            if (parseInt(style.zIndex) > 100) {
-                                importantStyles.isOverlay = true;
-                            }
+                        if ((style.position === 'fixed' || style.position === 'absolute') &&
+                            (parseInt(style.zIndex) > 10 || style.zIndex === 'auto')) {
+                            importantStyles.isOverlay = true;
+                        }
+
+                        // Check if element has error-like styling
+                        importantStyles.isErrorLike = false;
+                        if (importantStyles.isErrorColor ||
+                            style.textDecoration.includes('underline') ||
+                            style.outline.includes('red') ||
+                            style.border.includes('red')) {
+                            importantStyles.isErrorLike = true;
                         }
 
                         return importantStyles;
@@ -103,7 +115,8 @@ class HTMLSimplifier:
                             targetParent.appendChild(clone);
 
                             const keepAttrs = ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
-                                              'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-'];
+                                              'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-',
+                                              'aria-invalid', 'aria-errormessage'];
 
                             for (const attr of Array.from(el.attributes || [])) {
                                 try {
@@ -140,7 +153,7 @@ class HTMLSimplifier:
                                 }
                             }
 
-                            if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(el.tagName.toLowerCase())) {
+                            if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link', 'button', 'select', 'textarea'].includes(el.tagName.toLowerCase())) {
                                 targetParent.removeChild(clone);
                                 return false;
                             }

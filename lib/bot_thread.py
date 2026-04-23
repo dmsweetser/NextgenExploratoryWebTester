@@ -374,6 +374,18 @@ THAT'S AN ORDER, SOLDIER!
             self.logger.error(f"Bot {self.bot_id} - Error getting next action: {str(e)}")
             return None
 
+    def _type_text_reliably(self, element, text):
+        """Type text into an element with human-like delays and error handling"""
+        try:
+            for char in text:
+                element.send_keys(char)
+                # Add small delay between keystrokes
+                time.sleep(.5)
+        except Exception as e:
+            self.logger.error(f"Error typing text reliably: {str(e)}")
+            # Fallback to standard send_keys if the reliable method fails
+            element.send_keys(text)
+
     def execute_action(self, action, step_number):
         try:
             self.select_options_cache = {}
@@ -386,10 +398,6 @@ THAT'S AN ORDER, SOLDIER!
             value = action.get('value', '')
             friendly_description = action.get('friendly_description', '')
             reasoning = action.get('reasoning', '')
-
-            # For SEND_KEYS, type more slowly and reliably
-            if action_type == 'SEND_KEYS':
-                value = self._process_send_keys_value(value)
 
             # Validate required fields
             if not action_type or not element_selector_type or not element_selector_value:
@@ -456,7 +464,6 @@ THAT'S AN ORDER, SOLDIER!
                     )
                     self.highlight_element(element)
                     element.clear()
-                    # More reliable typing with better error handling
                     self._type_text_reliably(element, value)
                     self.unhighlight_element(element)
                 elif action_type == 'SELECT_BY_VALUE':
