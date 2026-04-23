@@ -53,6 +53,22 @@ class HTMLSimplifier:
                         return rect.width > 0 && rect.height > 0;
                     }
 
+                    function getCriticalStyles(el) {
+                        const style = window.getComputedStyle(el);
+                        const criticalProps = [
+                            'color', 'z-index'                  
+                        ];
+
+                        let styleString = '';
+                        for (const prop of criticalProps) {
+                            const value = style.getPropertyValue(prop);
+                            if (value && value !== 'none' && value !== '0px' && value !== 'auto') {
+                                styleString += ` ${prop}:${value};`;
+                            }
+                        }
+                        return styleString;
+                    }
+
                     function cloneElementWithSemantics(el, targetParent) {
                         try {
                             if (!isElementVisible(el) || processedElements.has(el)) return false;
@@ -63,6 +79,12 @@ class HTMLSimplifier:
 
                             const keepAttrs = ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
                                               'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-'];
+
+                            // Add critical computed styles as data attribute
+                            const criticalStyles = getCriticalStyles(el);
+                            if (criticalStyles) {
+                                clone.setAttribute('data-newt-critical-styles', criticalStyles);
+                            }
 
                             for (const attr of Array.from(el.attributes || [])) {
                                 try {
@@ -199,10 +221,11 @@ class HTMLSimplifier:
             # Remove duplicate content
             seen = set()
             for tag in soup.find_all():
-                # Preserve useful attributes for selectors
+                # Preserve useful attributes for selectors and critical styles
                 for attr in list(tag.attrs):
                     if attr not in ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
-                                  'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-']:
+                                  'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-',
+                                  'data-newt-critical-styles']:
                         del tag[attr]
 
                 tag_str = str(tag)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEWT Test Website (Enhanced)</title>
+    <title>User Account Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -16,18 +16,59 @@
         .btn-custom {
             margin: 5px;
         }
-        .bug-section {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        .hidden-unless-hover:hover + .hidden-content {
-            display: block;
-        }
         .hidden-content {
             display: none;
-            color: red;
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .notification-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+        }
+        .notification-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+        .low-contrast {
+            color: #6c757d;
+            background-color: #f8f9fa;
+        }
+        .delayed-message {
+            display: none;
+        }
+        .conditional-message {
+            display: none;
+        }
+        .dynamic-error {
+            color: #dc3545;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+        }
+        .unusual-pattern {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
         }
         .invisible {
             visibility: hidden;
@@ -37,277 +78,393 @@
             height: 0;
             overflow: hidden;
         }
-        .randomthing {
+        .overlay-element {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .randomthing-content {
+            top: 20%;
+            left: 20%;
+            width: 60%;
             background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-            max-width: 400px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1001;
+            display: none;
         }
-        .randomthing-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
+        .text-error {
+            color: #dc3545;
+            text-decoration: underline;
         }
-        .randomthing-buttons button {
-            padding: 10px 20px;
-            min-width: 60px;
+        .border-error {
+            border: 2px solid #dc3545 !important;
+        }
+        .outline-error {
+            outline: 2px solid #dc3545;
+        }
+        .background-error {
+            background-color: #f8d7da !important;
         }
     </style>
 </head>
 <body>
-    <!-- randomthing that intercepts all interactions -->
-    <div class="randomthing" id="mathrandomthing">
-        <div class="randomthing-content">
-            <h3>Please verify you're not a robot</h3>
-            <p>What is 1 + 1?</p>
-            <div class="randomthing-buttons">
-                <button class="btn btn-outline-primary" onclick="wrongAnswer()">1</button>
-                <button class="btn btn-primary" onclick="correctAnswer()">2</button>
-                <button class="btn btn-outline-primary" onclick="wrongAnswer()">3</button>
-                <button class="btn btn-outline-primary" onclick="wrongAnswer()">4</button>
-            </div>
+    <div class="notification-backdrop" id="notificationBackdrop"></div>
+    <div class="notification-overlay" id="notificationOverlay">
+        <h4>System Message</h4>
+        <p id="notificationText">Your session will expire in 5 minutes. Please save your work.</p>
+        <div id="notificationError" class="dynamic-error" style="display: none;">
+            ERROR: Session validation failed. Please try again.
         </div>
+        <button class="btn btn-primary" onclick="closeNotification()">Close</button>
+        <button class="btn btn-secondary" onclick="showNotificationError()">More Info</button>
     </div>
 
-    <div class="container" id="mainContent" style="display: none;">
-        <h1 class="mb-4">NEWT Test Website</h1>
-        <p class="lead">Enhanced test site for validating the HTML simplifier and detecting bugs.</p>
+    <div class="overlay-element" id="overlayElement">
+        <h5>Additional Options</h5>
+        <div class="mb-3">
+            <label for="overlayInput" class="form-label">Enter additional information</label>
+            <input type="text" class="form-control" id="overlayInput">
+        </div>
+        <button class="btn btn-primary" onclick="closeOverlay()">Submit</button>
+        <button class="btn btn-secondary" onclick="closeOverlay()">Cancel</button>
+    </div>
 
-        <!-- Login Form with Validation -->
+    <div class="container">
+        <h1 class="mb-4">Account Management</h1>
+
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Login Form (With Validation)</h5>
+                <h5>Authentication</h5>
             </div>
             <div class="card-body">
                 <form id="loginForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" placeholder="Enter username" required>
-                        <div id="usernameError" class="invalid-feedback" style="display: none;">
-                            Username is required.
+                        <input type="text" class="form-control" id="username" placeholder="Enter username">
+                        <div id="usernameError" class="dynamic-error">
+                            Username must be at least 3 characters.
+                        </div>
+                        <div id="usernameWarning" style="color: #856404; background-color: #fff3cd; padding: 10px; margin-top: 10px; border-radius: 5px; display: none;">
+                            Usernames with special characters may cause issues.
                         </div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" placeholder="Enter password" required>
-                        <div id="passwordError" class="invalid-feedback" style="display: none;">
+                        <input type="password" class="form-control" id="password" placeholder="Enter password">
+                        <div id="passwordError" class="dynamic-error">
                             Password must be at least 8 characters.
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Login</button>
-                    <button type="button" class="btn btn-secondary" id="showErrorBtn">Show Validation Errors</button>
-                    <button type="button" class="btn btn-warning" id="toggleHiddenFieldBtn">Toggle Hidden Field</button>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" placeholder="Enter email">
+                        <div id="emailError" class="dynamic-error">
+                            Please enter a valid email address.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Sign In</button>
+                    <button type="button" class="btn btn-secondary" id="showErrorsBtn">Validate</button>
+                    <button type="button" class="btn btn-info" id="showOverlayBtn">System Message</button>
                 </form>
-                <div id="hiddenFieldContainer" style="display: none; margin-top: 10px;">
-                    <label for="hiddenField" class="form-label">Hidden Field (Should Not Be Visible Initially)</label>
-                    <input type="text" class="form-control" id="hiddenField" placeholder="This field is hidden">
+                <div id="formSuccess" style="color: #155724; background-color: #d4edda; padding: 10px; margin-top: 10px; border-radius: 5px; display: none;">
+                    Authentication successful.
                 </div>
-                <script>
-                    document.getElementById('loginForm').addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        const username = document.getElementById('username').value;
-                        const password = document.getElementById('password').value;
-                        let isValid = true;
+                <div id="unusualError" class="unusual-pattern">
+SYSTEM STATUS: DEGRADED
+----------------------------------------
+The authentication service is currently experiencing issues.
 
-                        if (!username) {
-                            document.getElementById('usernameError').style.display = 'block';
-                            isValid = false;
-                        } else {
-                            document.getElementById('usernameError').style.display = 'none';
-                        }
-
-                        if (!password || password.length < 8) {
-                            document.getElementById('passwordError').style.display = 'block';
-                            isValid = false;
-                        } else {
-                            document.getElementById('passwordError').style.display = 'none';
-                        }
-
-                        if (isValid) {
-                            alert('Login successful!');
-                        }
-                    });
-
-                    document.getElementById('showErrorBtn').addEventListener('click', function() {
-                        document.getElementById('usernameError').style.display = 'block';
-                        document.getElementById('passwordError').style.display = 'block';
-                    });
-
-                    document.getElementById('toggleHiddenFieldBtn').addEventListener('click', function() {
-                        const container = document.getElementById('hiddenFieldContainer');
-                        container.style.display = container.style.display === 'none' ? 'block' : 'none';
-                    });
-                </script>
+Technical details:
+- Service: AuthService
+- Status: Degraded
+- Impact: Some users may experience delays
+                    </div>
+                    <div id="lowContrastError" class="low-contrast">
+                        This message might be difficult to read.
+                    </div>
+                    <div id="delayedError" class="delayed-message dynamic-error">
+                        This error appeared after a delay.
+                    </div>
+                    <div id="textError" class="text-error" style="margin-top: 10px;">
+                        This text has error styling.
+                    </div>
+                    <div id="borderError" class="border-error" style="margin-top: 10px; padding: 10px;">
+                        This element has an error border.
+                    </div>
+                    <div id="outlineError" class="outline-error" style="margin-top: 10px; padding: 10px;">
+                        This element has an error outline.
+                    </div>
+                    <div id="backgroundError" class="background-error" style="margin-top: 10px; padding: 10px;">
+                        This element has an error background.
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <!-- Dropdown with Hidden Content -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Dropdown Menu (With Hidden Content)</h5>
+                <h5>Account Settings</h5>
             </div>
             <div class="card-body">
-                <div class="dropdown">
+                <div class="dropdown mb-3">
                     <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
                         Select an option
                     </button>
-                    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                        <a class="dropdown-item" href="#">Option 1</a>
-                        <a class="dropdown-item" href="#">Option 2</a>
-                        <a class="dropdown-item" href="#">Option 3</a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#">Profile Settings</a>
+                        <a class="dropdown-item" href="#">Security Options</a>
+                        <a class="dropdown-item" href="#">Preferences</a>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="#" id="brokenLink">Broken Link (404)</a>
+                        <a class="dropdown-item" href="#" id="brokenLink">Account History</a>
+                        <a class="dropdown-item" href="#" id="errorLink">Delete Account</a>
                     </div>
-                </div>
-                <div class="hidden-unless-hover" style="margin-top: 10px; padding: 10px; background: #eee;">
-                    Hover over me to reveal hidden content!
                 </div>
                 <div class="hidden-content">
-                    This content is only visible on hover. The bot should NOT see this unless it simulates hover.
+                    <div class="dynamic-error">This content only appears on hover!</div>
                 </div>
-                <div id="youBetterNotShowUp" style="display:none">
-                    This better not show up during self-test (display:none)
+                <div id="dropdownError" class="dynamic-error" style="display: none; margin-top: 10px;">
+                    This action is not available for your account type.
                 </div>
                 <div class="invisible">
-                    This is invisible (visibility:hidden)
+                    This should not be visible
                 </div>
                 <div class="zero-size">
-                    This is zero-sized (width/height:0)
+                    This should not be visible either
                 </div>
+                <button type="button" class="btn btn-info" id="showOverlayElementBtn">Show Options</button>
             </div>
         </div>
 
-        <!-- Form with Select and Dynamic Options -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Dynamic Select Form</h5>
+                <h5>Update Preferences</h5>
             </div>
             <div class="card-body">
-                <form>
+                <form id="preferencesForm">
                     <div class="mb-3">
-                        <label for="dynamicSelect" class="form-label">Dynamic Select</label>
-                        <select class="form-select" id="dynamicSelect">
-                            <option selected>Select an option</option>
-                            <option value="1">Option 1</option>
-                            <option value="2">Option 2</option>
-                            <option value="3">Option 3</option>
+                        <label for="themeSelect" class="form-label">Theme</label>
+                        <select class="form-select" id="themeSelect">
+                            <option selected>Select theme</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="system">System Default</option>
+                        </select>
+                        <div id="selectError" class="dynamic-error">
+                            Please select a valid option.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="languageSelect" class="form-label">Language</label>
+                        <select class="form-select" id="languageSelect">
+                            <option selected>Select language</option>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label for="dependentField" class="form-label">Dependent Field</label>
-                        <input type="text" class="form-control" id="dependentField" placeholder="This appears after selecting Option 3" style="display: none;">
+                    <div class="mb-3" id="dependentFieldContainer" style="display: none;">
+                        <label for="dependentField" class="form-label">Additional Settings</label>
+                        <input type="text" class="form-control" id="dependentField" placeholder="Enter additional settings">
+                        <div id="dependentError" class="dynamic-error">
+                            This field is required when Dark theme is selected.
+                        </div>
                     </div>
-                    <button type="button" class="btn btn-primary" id="updateSelectBtn">Update Select Options</button>
-                    <button type="submit" class="btn btn-secondary">Submit</button>
+                    <div class="mb-3">
+                        <label for="conditionalSelect" class="form-label">Notification Frequency</label>
+                        <select class="form-select" id="conditionalSelect">
+                            <option selected>Select frequency</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                        <div id="conditionalError" class="conditional-message dynamic-error">
+                            You must select Weekly to proceed.
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="updateSelectBtn">Update Options</button>
+                    <button type="submit" class="btn btn-secondary">Save Preferences</button>
+                    <button type="button" class="btn btn-danger" id="showDelayedErrorBtn">Test Delay</button>
                 </form>
-                <script>
-                    document.getElementById('dynamicSelect').addEventListener('change', function() {
-                        const dependentField = document.getElementById('dependentField');
-                        dependentField.style.display = this.value === '3' ? 'block' : 'none';
-                    });
-
-                    document.getElementById('updateSelectBtn').addEventListener('click', function() {
-                        const select = document.getElementById('dynamicSelect');
-                        select.innerHTML = '<option selected>Updated Option 1</option><option>Updated Option 2</option>';
-                    });
-                </script>
             </div>
         </div>
 
-        <!-- Buttons with Various States -->
-        <div class="card mb-4">
+        <div class="card">
             <div class="card-header">
-                <h5>Button States</h5>
+                <h5>Account Actions</h5>
             </div>
             <div class="card-body">
-                <button class="btn btn-primary btn-custom" id="normalButton">Normal Button</button>
-                <button class="btn btn-secondary btn-custom" id="disabledButton" disabled>Disabled Button</button>
-                <button class="btn btn-success btn-custom" id="jsButton">JS Button (Click Me)</button>
-                <button class="btn btn-danger btn-custom" id="errorButton">Simulate Error</button>
-                <button class="btn btn-warning btn-custom" id="slowButton">Slow Response (3s)</button>
-                <script>
-                    document.getElementById('jsButton').addEventListener('click', function() {
-                        alert('JavaScript button clicked!');
-                    });
-
-                    document.getElementById('errorButton').addEventListener('click', function() {
-                        document.getElementById('simulatedError').style.display = 'block';
-                    });
-
-                    document.getElementById('slowButton').addEventListener('click', function() {
-                        this.disabled = true;
-                        this.textContent = 'Loading...';
-                        setTimeout(() => {
-                            this.disabled = false;
-                            this.textContent = 'Slow Response (3s)';
-                            alert('Slow response completed!');
-                        }, 3000);
-                    });
-                </script>
-                <div id="simulatedError" style="display: none; color: red; margin-top: 10px;">
-                    ERROR: This is a simulated error for the bot to detect!
+                <button class="btn btn-primary btn-custom" id="normalButton">Update Profile</button>
+                <button class="btn btn-secondary btn-custom" id="disabledButton" disabled>Change Password</button>
+                <button class="btn btn-success btn-custom" id="jsButton">Enable 2FA</button>
+                <button class="btn btn-danger btn-custom" id="errorButton">Delete Account</button>
+                <button class="btn btn-warning btn-custom" id="slowButton">Export Data</button>
+                <button class="btn btn-info btn-custom" id="conditionalButton">Update Settings</button>
+                <div id="buttonError" class="dynamic-error" style="display: none; margin-top: 10px;">
+                    This action failed due to insufficient permissions.
                 </div>
-            </div>
-        </div>
-
-        <!-- Known Bugs Section -->
-        <div class="bug-section">
-            <h5>Known Bugs and Edge Cases</h5>
-            <ul>
-                <li><strong>Validation Errors:</strong> Click "Show Validation Errors" to reveal hidden error messages.</li>
-                <li><strong>Hidden Field:</strong> Click "Toggle Hidden Field" to show/hide a field dynamically.</li>
-                <li><strong>Broken Link:</strong> The "Broken Link (404)" in the dropdown menu leads nowhere.</li>
-                <li><strong>Hover Content:</strong> The "Hover over me" div reveals content only on hover (should not be visible to the bot unless it simulates hover).</li>
-                <li><strong>Invisible/Zero-sized Elements:</strong> These should not be visible or interactable.</li>
-                <li><strong>Dynamic Select:</strong> Selecting "Option 3" reveals a dependent field. The "Update Select Options" button changes the select options dynamically.</li>
-                <li><strong>Simulated Error:</strong> Click "Simulate Error" to show an error message.</li>
-                <li><strong>Slow Response:</strong> Click "Slow Response (3s)" to simulate a slow API call.</li>
-            </ul>
-        </div>
-
-        <!-- Accessibility Issues -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5>Accessibility Issues</h5>
-            </div>
-            <div class="card-body">
-                <p>This section contains intentional accessibility issues for the bot to detect:</p>
-                <img src="missing-image.jpg" alt="" class="mb-3"> <!-- Missing alt text -->
-                <button class="btn btn-info" aria-label="">No ARIA Label</button> <!-- Missing ARIA label -->
-                <div role="alert" style="color: red;">This is an alert with no visible text for screen readers.</div>
-                <form>
-                    <div class="mb-3">
-                        <input type="text" class="form-control" placeholder="No label or ARIA"> <!-- Missing label -->
-                    </div>
-                </form>
+                <div id="buttonSuccess" style="color: #155724; background-color: #d4edda; padding: 10px; margin-top: 10px; border-radius: 5px; display: none;">
+                    Action completed successfully!
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function correctAnswer() {
-            document.getElementById('mathrandomthing').style.display = 'none';
-            document.getElementById('mainContent').style.display = 'block';
+        // Login form validation
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value;
+            let isValid = true;
+
+            // Reset errors
+            document.querySelectorAll('.dynamic-error, .warning-message').forEach(el => {
+                el.style.display = 'none';
+            });
+
+            if (!username || username.length < 3) {
+                document.getElementById('usernameError').style.display = 'block';
+                isValid = false;
+            } else if (/[^a-zA-Z0-9]/.test(username)) {
+                document.getElementById('usernameWarning').style.display = 'block';
+            }
+
+            if (!password || password.length < 8) {
+                document.getElementById('passwordError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+                document.getElementById('emailError').style.display = 'block';
+                isValid = false;
+            }
+
+            if (isValid) {
+                // Show unusual error 30% of the time
+                if (Math.random() < 0.3) {
+                    document.getElementById('unusualError').style.display = 'block';
+                } else {
+                    document.getElementById('formSuccess').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('formSuccess').style.display = 'none';
+                    }, 2000);
+                }
+            }
+        });
+
+        document.getElementById('showErrorsBtn').addEventListener('click', function() {
+            document.getElementById('usernameError').style.display = 'block';
+            document.getElementById('passwordError').style.display = 'block';
+            document.getElementById('emailError').style.display = 'block';
+            document.getElementById('lowContrastError').style.display = 'block';
+            document.getElementById('textError').style.display = 'block';
+        });
+
+        document.getElementById('showOverlayBtn').addEventListener('click', function() {
+            document.getElementById('notificationBackdrop').style.display = 'block';
+            document.getElementById('notificationOverlay').style.display = 'block';
+        });
+
+        function closeNotification() {
+            document.getElementById('notificationBackdrop').style.display = 'none';
+            document.getElementById('notificationOverlay').style.display = 'none';
         }
 
-        function wrongAnswer() {
-            alert('Wrong answer! Please try again.');
+        function showNotificationError() {
+            document.getElementById('notificationError').style.display = 'block';
+        }
+
+        // Theme select handling
+        document.getElementById('themeSelect').addEventListener('change', function() {
+            const dependentField = document.getElementById('dependentFieldContainer');
+            const dependentError = document.getElementById('dependentError');
+            dependentField.style.display = this.value === 'dark' ? 'block' : 'none';
+            dependentError.style.display = this.value === 'dark' ? 'block' : 'none';
+        });
+
+        document.getElementById('conditionalSelect').addEventListener('change', function() {
+            const conditionalError = document.getElementById('conditionalError');
+            conditionalError.style.display = this.value !== 'weekly' ? 'block' : 'none';
+        });
+
+        document.getElementById('updateSelectBtn').addEventListener('click', function() {
+            const select = document.getElementById('themeSelect');
+            select.innerHTML = '<option selected>Updated Theme 1</option><option>Updated Theme 2</option><option>Updated Theme 3</option>';
+            document.getElementById('selectError').style.display = 'block';
+        });
+
+        document.getElementById('preferencesForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const themeSelect = document.getElementById('themeSelect').value;
+            const conditionalSelect = document.getElementById('conditionalSelect').value;
+
+            if (themeSelect === 'Select theme') {
+                document.getElementById('selectError').style.display = 'block';
+            } else {
+                document.getElementById('selectError').style.display = 'none';
+            }
+
+            if (conditionalSelect !== 'weekly') {
+                document.getElementById('conditionalError').style.display = 'block';
+            } else {
+                document.getElementById('conditionalError').style.display = 'none';
+            }
+        });
+
+        document.getElementById('showDelayedErrorBtn').addEventListener('click', function() {
+            setTimeout(() => {
+                document.getElementById('delayedError').style.display = 'block';
+            }, 2000);
+        });
+
+        // Button event handlers
+        document.getElementById('jsButton').addEventListener('click', function() {
+            document.getElementById('buttonSuccess').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('buttonSuccess').style.display = 'none';
+            }, 2000);
+        });
+
+        document.getElementById('errorButton').addEventListener('click', function() {
+            document.getElementById('buttonError').style.display = 'block';
+        });
+
+        document.getElementById('slowButton').addEventListener('click', function() {
+            this.disabled = true;
+            this.textContent = 'Processing...';
+            setTimeout(() => {
+                this.disabled = false;
+                this.textContent = 'Export Data';
+                document.getElementById('buttonSuccess').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('buttonSuccess').style.display = 'none';
+                }, 2000);
+            }, 3000);
+        });
+
+        document.getElementById('conditionalButton').addEventListener('click', function() {
+            // Show error 50% of the time
+            if (Math.random() < 0.5) {
+                document.getElementById('buttonError').style.display = 'block';
+            } else {
+                document.getElementById('buttonSuccess').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('buttonSuccess').style.display = 'none';
+                }, 2000);
+            }
+        });
+
+        // Dropdown error handling
+        document.getElementById('errorLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('dropdownError').style.display = 'block';
+        });
+
+        // Overlay element
+        document.getElementById('showOverlayElementBtn').addEventListener('click', function() {
+            document.getElementById('overlayElement').style.display = 'block';
+        });
+
+        function closeOverlay() {
+            document.getElementById('overlayElement').style.display = 'none';
         }
     </script>
 </body>
