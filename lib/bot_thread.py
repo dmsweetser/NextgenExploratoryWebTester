@@ -168,13 +168,15 @@ class BotThread(threading.Thread):
 
     def get_html_diff(self, before_html, after_html):
         """Generate a diff between before and after HTML, showing only changes if they're small"""
+        if not before_html or not after_html:
+            return after_html
+
         before_lines = before_html.splitlines()
         after_lines = after_html.splitlines()
 
         diff = list(difflib.unified_diff(before_lines, after_lines, n=0))
 
-        # If diff is small, return just the diff
-        if len(diff) <= self.max_diff_lines + 3:  # +3 for diff header lines
+        if len(diff) < len(after_lines) * 0.7 and len(diff) > 0:
             return "\n".join(diff)
         else:
             return after_html
@@ -372,6 +374,18 @@ THAT'S AN ORDER, SOLDIER!
             self.logger.error(f"Bot {self.bot_id} - Error getting next action: {str(e)}")
             return None
 
+    def _type_text_reliably(self, element, text):
+        """Type text into an element with human-like delays and error handling"""
+        try:
+            for char in text:
+                element.send_keys(char)
+                # Add small delay between keystrokes
+                time.sleep(.5)
+        except Exception as e:
+            self.logger.error(f"Error typing text reliably: {str(e)}")
+            # Fallback to standard send_keys if the reliable method fails
+            element.send_keys(text)
+
     def execute_action(self, action, step_number):
         try:
             self.select_options_cache = {}
@@ -450,10 +464,7 @@ THAT'S AN ORDER, SOLDIER!
                     )
                     self.highlight_element(element)
                     element.clear()
-                    # Type like a human with small delays between keystrokes
-                    for char in value:
-                        element.send_keys(char)
-                        time.sleep(0.05 + (0.1 * random.random()))  # Random delay between keystrokes
+                    self._type_text_reliably(element, value)
                     self.unhighlight_element(element)
                 elif action_type == 'SELECT_BY_VALUE':
                     select = Select(WebDriverWait(self.driver, self.default_wait).until(
