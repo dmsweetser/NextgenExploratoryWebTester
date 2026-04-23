@@ -168,13 +168,15 @@ class BotThread(threading.Thread):
 
     def get_html_diff(self, before_html, after_html):
         """Generate a diff between before and after HTML, showing only changes if they're small"""
+        if not before_html or not after_html:
+            return after_html
+
         before_lines = before_html.splitlines()
         after_lines = after_html.splitlines()
 
         diff = list(difflib.unified_diff(before_lines, after_lines, n=0))
 
-        # If diff is reasonably small, return just the diff
-        if len(diff) < len(before_lines):
+        if len(diff) < len(after_lines) * 0.7:
             return "\n".join(diff)
         else:
             return after_html

@@ -151,7 +151,29 @@
                 <tbody>
                     {% for bug in bugs %}
                     <tr>
-                        <td>{{ bug['summary'] }}</td>
+                        <td>
+                            <div class="bug-summary">
+                                {{ bug['summary'] }}
+                                <button class="btn btn-sm btn-outline-info float-end" data-bs-toggle="collapse"
+                                    data-bs-target="#bugDetails-{{ bug['id'] }}">
+                                    <i class="bi bi-chevron-down"></i> Details
+                                </button>
+                            </div>
+                            <div class="collapse mt-2" id="bugDetails-{{ bug['id'] }}">
+                                <div class="card card-body bg-light">
+                                    <div class="bug-details">
+                                        <p><strong>Steps to Reproduce:</strong></p>
+                                        <ol>
+                                            {% for step in db.get_steps(bug['bot_id']) %}
+                                            <li>{{ step['friendly_description'] if step['friendly_description'] else step['action'] }}</li>
+                                            {% endfor %}
+                                        </ol>
+                                        <p><strong>Knowledge:</strong></p>
+                                        <div style="white-space: pre-wrap;">{{ db.get_knowledge_for_bug(bug['id']) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
                         <td>
                             <a href="{{ url_for('export_bug', bug_id=bug['id']) }}"
                                 class="btn btn-sm btn-outline-secondary">
