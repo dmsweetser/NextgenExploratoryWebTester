@@ -178,8 +178,10 @@ class BotThread(threading.Thread):
 
         if len(diff) < len(after_lines) * 0.7 and len(diff) > 0:
             return "\n".join(diff)
-        else:
+        elif before_lines != after_lines:
             return after_html
+        else:
+            return "The AFTER HTML was identical to the BEFORE HTML"
 
     def stop(self):
         self.stop_event.set()
