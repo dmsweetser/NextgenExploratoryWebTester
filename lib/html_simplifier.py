@@ -305,16 +305,16 @@ class HTMLSimplifier:
             heading_matches = re.findall(r'<h[1-6][^>]*>(.*?)</h[1-6]>', html_content, re.DOTALL | re.IGNORECASE)
             if heading_matches:
                 headings = [re.sub(r'<[^>]+>', ' ', h).strip() for h in heading_matches]
-                return "Page Headings: " + " | ".join(headings[:5])
+                return "Page Headings: " + " | ".join(headings)
 
             link_matches = re.findall(r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', html_content, re.DOTALL | re.IGNORECASE)
             if link_matches:
-                links = [f"{text.strip() if text.strip() else url}" for url, text in link_matches[:10]]
+                links = [f"{text.strip() if text.strip() else url}" for url, text in link_matches]
                 return "Page Links: " + " | ".join(links)
 
             para_matches = re.findall(r'<p[^>]*>(.*?)</p>', html_content, re.DOTALL | re.IGNORECASE)
             if para_matches:
-                paras = [re.sub(r'<[^>]+>', ' ', p).strip() for p in para_matches[:3]]
+                paras = [re.sub(r'<[^>]+>', ' ', p).strip() for p in para_matches]
                 return "Page Content: " + " | ".join(paras)
 
             text_match = re.search(r'>([^<]{10,})<', html_content)

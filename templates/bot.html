@@ -164,22 +164,12 @@
                                     <div class="bug-details">
                                         <p><strong>Steps to Reproduce:</strong></p>
                                         <ol>
-                                            {% for step in db.get_steps(bug['bot_id']) %}
+                                            {% for step in bug['steps'] %}
                                             <li>{{ step['friendly_description'] if step['friendly_description'] else step['action'] }}</li>
                                             {% endfor %}
                                         </ol>
                                         <p><strong>Knowledge:</strong></p>
                                         <div style="white-space: pre-wrap;">{{ db.get_knowledge_for_bug(bug['id']) }}</div>
-                                        <p><strong>Reasoning:</strong></p>
-                                        <div style="white-space: pre-wrap;">
-                                            {% set knowledge = db.get_knowledge_for_bug(bug['id']) %}
-                                            {% if 'RECOMMENDATION:' in knowledge %}
-                                                {% set parts = knowledge.split('RECOMMENDATION:') %}
-                                                {{ parts[0].split('DESCRIPTION:')[1] | trim if 'DESCRIPTION:' in parts[0] else parts[0] }}
-                                            {% else %}
-                                                {{ knowledge }}
-                                            {% endif %}
-                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -733,7 +733,7 @@ Explain specifically how this bug impacts end users and prevents them from compl
             self.logger.info(f"Bot {self.bot_id} - Bug not reported: insufficient confirmation or not a REAL issue impacting end users")
             return None
 
-        summary = f"NEWT Bug Detected: {analysis['description'][:100]}..."
+        summary = f"NEWT Bug Detected: {analysis['description']}..."
         steps = json.dumps(context['steps_taken'])
 
         try:
