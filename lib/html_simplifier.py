@@ -53,59 +53,6 @@ class HTMLSimplifier:
                         return rect.width > 0 && rect.height > 0;
                     }
 
-                    function getComputedStyles(el) {
-                        const style = window.getComputedStyle(el);
-                        const importantStyles = {
-                            'color': style.color,
-                            'backgroundColor': style.backgroundColor,
-                            'zIndex': style.zIndex,
-                            'position': style.position,
-                            'width': style.width,
-                            'height': style.height,
-                            'fontSize': style.fontSize,
-                            'fontWeight': style.fontWeight,
-                            'border': style.border,
-                            'boxShadow': style.boxShadow,
-                            'opacity': style.opacity,
-                            'visibility': style.visibility,
-                            'display': style.display,
-                            'textDecoration': style.textDecoration,
-                            'outline': style.outline
-                        };
-
-                        // Check if color is red (common for error messages)
-                        const color = style.color;
-                        if (color) {
-                            const rgb = color.match(/\\d+/g);
-                            if (rgb && rgb.length >= 3) {
-                                const r = parseInt(rgb[0]);
-                                const g = parseInt(rgb[1]);
-                                const b = parseInt(rgb[2]);
-                                importantStyles.isRed = (r > 200 && g < 100 && b < 100);
-                                importantStyles.isErrorColor = (r > 200 && g < 100 && b < 100) ||
-                                                              (r > 150 && g < 50 && b < 50);
-                            }
-                        }
-
-                        // Check if element is likely an overlay
-                        importantStyles.isOverlay = false;
-                        if ((style.position === 'fixed' || style.position === 'absolute') &&
-                            (parseInt(style.zIndex) > 10 || style.zIndex === 'auto')) {
-                            importantStyles.isOverlay = true;
-                        }
-
-                        // Check if element has error-like styling
-                        importantStyles.isErrorLike = false;
-                        if (importantStyles.isErrorColor ||
-                            style.textDecoration.includes('underline') ||
-                            style.outline.includes('red') ||
-                            style.border.includes('red')) {
-                            importantStyles.isErrorLike = true;
-                        }
-
-                        return importantStyles;
-                    }
-
                     function cloneElementWithSemantics(el, targetParent) {
                         try {
                             if (!isElementVisible(el) || processedElements.has(el)) return false;
@@ -115,8 +62,7 @@ class HTMLSimplifier:
                             targetParent.appendChild(clone);
 
                             const keepAttrs = ['id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt', 'title',
-                                              'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-',
-                                              'aria-invalid', 'aria-errormessage'];
+                                              'placeholder', 'role', 'aria-label', 'aria-labelledby', 'for', 'data-'];
 
                             for (const attr of Array.from(el.attributes || [])) {
                                 try {
@@ -125,14 +71,6 @@ class HTMLSimplifier:
                                     }
                                 } catch (e) {
                                     continue;
-                                }
-                            }
-
-                            // Add computed styles as data attributes
-                            const computedStyles = getComputedStyles(el);
-                            for (const [key, value] of Object.entries(computedStyles)) {
-                                if (value !== '' && value !== 'auto' && value !== 'normal') {
-                                    clone.setAttribute(`data-computed-${key}`, value);
                                 }
                             }
 
@@ -153,7 +91,7 @@ class HTMLSimplifier:
                                 }
                             }
 
-                            if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link', 'button', 'select', 'textarea'].includes(el.tagName.toLowerCase())) {
+                            if (!hasVisibleChildren && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(el.tagName.toLowerCase())) {
                                 targetParent.removeChild(clone);
                                 return false;
                             }
