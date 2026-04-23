@@ -173,8 +173,8 @@ class BotThread(threading.Thread):
 
         diff = list(difflib.unified_diff(before_lines, after_lines, n=0))
 
-        # If diff is small, return just the diff
-        if len(diff) <= self.max_diff_lines + 3:  # +3 for diff header lines
+        # If diff is reasonably small, return just the diff
+        if len(diff) < len(before_lines):
             return "\n".join(diff)
         else:
             return after_html
@@ -385,6 +385,10 @@ THAT'S AN ORDER, SOLDIER!
             friendly_description = action.get('friendly_description', '')
             reasoning = action.get('reasoning', '')
 
+            # For SEND_KEYS, type more slowly and reliably
+            if action_type == 'SEND_KEYS':
+                value = self._process_send_keys_value(value)
+
             # Validate required fields
             if not action_type or not element_selector_type or not element_selector_value:
                 error_msg = f"Invalid action parameters: {action}"
@@ -450,10 +454,8 @@ THAT'S AN ORDER, SOLDIER!
                     )
                     self.highlight_element(element)
                     element.clear()
-                    # Type like a human with small delays between keystrokes
-                    for char in value:
-                        element.send_keys(char)
-                        time.sleep(0.05 + (0.1 * random.random()))  # Random delay between keystrokes
+                    # More reliable typing with better error handling
+                    self._type_text_reliably(element, value)
                     self.unhighlight_element(element)
                 elif action_type == 'SELECT_BY_VALUE':
                     select = Select(WebDriverWait(self.driver, self.default_wait).until(

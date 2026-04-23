@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEWT Test Website (Enhanced)</title>
+    <title>NEWT Test Website (Enhanced with Error Detection)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -67,6 +67,136 @@
             padding: 10px 20px;
             min-width: 60px;
         }
+        .error-message {
+            color: #dc3545;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            display: none;
+        }
+        .warning-message {
+            color: #856404;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            display: none;
+        }
+        .success-message {
+            color: #155724;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            display: none;
+        }
+        .overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 1001;
+            display: none;
+        }
+        .overlay-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+        }
+        .unusual-error {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+        .unusual-warning {
+            color: #856404;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        .dynamic-error {
+            color: #dc3545;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            display: none;
+            position: relative;
+            z-index: 10;
+        }
+        .dynamic-overlay {
+            position: fixed;
+            top: 20%;
+            left: 20%;
+            width: 60%;
+            height: 60%;
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 3px solid #dc3545;
+            border-radius: 10px;
+            z-index: 1000;
+            display: none;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        .low-contrast-error {
+            color: #6c757d;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .hidden-error {
+            display: none;
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .delayed-error {
+            color: #dc3545;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            display: none;
+        }
+        .conditional-error {
+            color: #dc3545;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -86,80 +216,203 @@
 
     <div class="container" id="mainContent" style="display: none;">
         <h1 class="mb-4">NEWT Test Website</h1>
-        <p class="lead">Enhanced test site for validating the HTML simplifier and detecting bugs.</p>
+        <p class="lead">Enhanced test site for validating error detection and overlay handling.</p>
 
         <!-- Login Form with Validation -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Login Form (With Validation)</h5>
+                <h5>Login Form (With Error Detection)</h5>
             </div>
             <div class="card-body">
                 <form id="loginForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
                         <input type="text" class="form-control" id="username" placeholder="Enter username" required>
-                        <div id="usernameError" class="invalid-feedback" style="display: none;">
-                            Username is required.
+                        <div id="usernameError" class="error-message">
+                            Username is required and must be at least 3 characters.
+                        </div>
+                        <div id="usernameWarning" class="warning-message">
+                            Username should not contain special characters.
                         </div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
                         <input type="password" class="form-control" id="password" placeholder="Enter password" required>
-                        <div id="passwordError" class="invalid-feedback" style="display: none;">
-                            Password must be at least 8 characters.
+                        <div id="passwordError" class="error-message">
+                            Password must be at least 8 characters and contain a number.
+                        </div>
+                        <div id="passwordWarning" class="warning-message">
+                            Consider using a stronger password.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" placeholder="Enter email">
+                        <div id="emailError" class="error-message">
+                            Please enter a valid email address.
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Login</button>
                     <button type="button" class="btn btn-secondary" id="showErrorBtn">Show Validation Errors</button>
                     <button type="button" class="btn btn-warning" id="toggleHiddenFieldBtn">Toggle Hidden Field</button>
+                    <button type="button" class="btn btn-info" id="showOverlayBtn">Show Overlay</button>
+                    <button type="button" class="btn btn-danger" id="showDynamicErrorBtn">Show Dynamic Error</button>
                 </form>
                 <div id="hiddenFieldContainer" style="display: none; margin-top: 10px;">
                     <label for="hiddenField" class="form-label">Hidden Field (Should Not Be Visible Initially)</label>
                     <input type="text" class="form-control" id="hiddenField" placeholder="This field is hidden">
+                    <div id="hiddenError" class="error-message">
+                        This error only appears when the hidden field is visible!
+                    </div>
+                </div>
+                <div id="formSuccess" class="success-message">
+                    Login successful! Redirecting...
+                </div>
+                <div id="unusualError" class="unusual-error">
+ERROR: SYSTEM FAILURE DETECTED
+----------------------------------------
+The login system has encountered an unexpected error.
+This is not a validation error, but a system-level failure.
+
+Technical details:
+- Error code: 500.1234
+- Timestamp: [current time]
+- Affected module: AuthenticationService
+- User impact: High
+
+Please contact support if this persists.
+                </div>
+                <div id="lowContrastError" class="low-contrast-error">
+                    This is a low contrast error message that might be hard to detect.
+                </div>
+                <div id="delayedError" class="delayed-error">
+                    This error appeared after a delay - simulating a server-side validation error.
                 </div>
                 <script>
                     document.getElementById('loginForm').addEventListener('submit', function(e) {
                         e.preventDefault();
                         const username = document.getElementById('username').value;
                         const password = document.getElementById('password').value;
+                        const email = document.getElementById('email').value;
                         let isValid = true;
 
-                        if (!username) {
+                        // Reset errors
+                        document.querySelectorAll('.error-message, .warning-message').forEach(el => {
+                            el.style.display = 'none';
+                        });
+
+                        if (!username || username.length < 3) {
                             document.getElementById('usernameError').style.display = 'block';
                             isValid = false;
-                        } else {
-                            document.getElementById('usernameError').style.display = 'none';
+                        } else if (/[^a-zA-Z0-9]/.test(username)) {
+                            document.getElementById('usernameWarning').style.display = 'block';
                         }
 
-                        if (!password || password.length < 8) {
+                        if (!password || password.length < 8 || !/\d/.test(password)) {
                             document.getElementById('passwordError').style.display = 'block';
                             isValid = false;
-                        } else {
-                            document.getElementById('passwordError').style.display = 'none';
+                        } else if (password.length < 12) {
+                            document.getElementById('passwordWarning').style.display = 'block';
+                        }
+
+                        if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+                            document.getElementById('emailError').style.display = 'block';
+                            isValid = false;
                         }
 
                         if (isValid) {
-                            alert('Login successful!');
+                            // Show unusual error 30% of the time
+                            if (Math.random() < 0.3) {
+                                document.getElementById('unusualError').style.display = 'block';
+                            } else {
+                                document.getElementById('formSuccess').style.display = 'block';
+                                setTimeout(() => {
+                                    document.getElementById('formSuccess').style.display = 'none';
+                                }, 2000);
+                            }
                         }
                     });
 
                     document.getElementById('showErrorBtn').addEventListener('click', function() {
                         document.getElementById('usernameError').style.display = 'block';
                         document.getElementById('passwordError').style.display = 'block';
+                        document.getElementById('emailError').style.display = 'block';
+                        document.getElementById('lowContrastError').style.display = 'block';
                     });
 
                     document.getElementById('toggleHiddenFieldBtn').addEventListener('click', function() {
                         const container = document.getElementById('hiddenFieldContainer');
                         container.style.display = container.style.display === 'none' ? 'block' : 'none';
+                        if (container.style.display === 'block') {
+                            document.getElementById('hiddenError').style.display = 'block';
+                        } else {
+                            document.getElementById('hiddenError').style.display = 'none';
+                        }
+                    });
+
+                    document.getElementById('showOverlayBtn').addEventListener('click', function() {
+                        document.getElementById('overlayBackdrop').style.display = 'block';
+                        document.getElementById('simpleOverlay').style.display = 'block';
+                    });
+
+                    document.getElementById('showDynamicErrorBtn').addEventListener('click', function() {
+                        document.getElementById('dynamicError').style.display = 'block';
+                        setTimeout(() => {
+                            document.getElementById('dynamicOverlay').style.display = 'block';
+                        }, 500);
                     });
                 </script>
             </div>
         </div>
 
+        <!-- Overlay Examples -->
+        <div class="overlay-backdrop" id="overlayBackdrop"></div>
+        <div class="overlay" id="simpleOverlay">
+            <h4>System Notification</h4>
+            <p>This is an important system notification that requires your attention.</p>
+            <p class="dynamic-error" id="overlayError">
+                ERROR: Session timeout detected. Please log in again.
+            </p>
+            <button class="btn btn-primary" onclick="closeOverlay()">Close</button>
+            <button class="btn btn-secondary" onclick="showOverlayError()">Show Error</button>
+            <script>
+                function closeOverlay() {
+                    document.getElementById('overlayBackdrop').style.display = 'none';
+                    document.getElementById('simpleOverlay').style.display = 'none';
+                }
+
+                function showOverlayError() {
+                    document.getElementById('overlayError').style.display = 'block';
+                }
+            </script>
+        </div>
+
+        <div class="dynamic-overlay" id="dynamicOverlay">
+            <h4>Dynamic Error Overlay</h4>
+            <p>This overlay appeared dynamically after an error was detected.</p>
+            <div class="dynamic-error">
+                ERROR: The system detected an unusual pattern in your input.
+                <br><br>
+                Details:
+                <ul>
+                    <li>Input too long (max 50 characters)</li>
+                    <li>Contains invalid characters</li>
+                    <li>Possible injection attempt detected</li>
+                </ul>
+            </div>
+            <button class="btn btn-primary" onclick="closeDynamicOverlay()">Close</button>
+        </div>
+        <script>
+            function closeDynamicOverlay() {
+                document.getElementById('dynamicOverlay').style.display = 'none';
+                document.getElementById('dynamicError').style.display = 'none';
+            }
+        </script>
+
         <!-- Dropdown with Hidden Content -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Dropdown Menu (With Hidden Content)</h5>
+                <h5>Dropdown Menu (With Error Cases)</h5>
             </div>
             <div class="card-body">
                 <div class="dropdown">
@@ -172,6 +425,7 @@
                         <a class="dropdown-item" href="#">Option 3</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="#" id="brokenLink">Broken Link (404)</a>
+                        <a class="dropdown-item" href="#" id="errorLink">Error Link</a>
                     </div>
                 </div>
                 <div class="hidden-unless-hover" style="margin-top: 10px; padding: 10px; background: #eee;">
@@ -179,6 +433,7 @@
                 </div>
                 <div class="hidden-content">
                     This content is only visible on hover. The bot should NOT see this unless it simulates hover.
+                    <div class="error-message">Hover error: This error only appears on hover!</div>
                 </div>
                 <div id="youBetterNotShowUp" style="display:none">
                     This better not show up during self-test (display:none)
@@ -189,16 +444,25 @@
                 <div class="zero-size">
                     This is zero-sized (width/height:0)
                 </div>
+                <script>
+                    document.getElementById('errorLink').addEventListener('click', function(e) {
+                        e.preventDefault();
+                        document.getElementById('dropdownError').style.display = 'block';
+                    });
+                </script>
+                <div id="dropdownError" class="error-message" style="display: none; margin-top: 10px;">
+                    ERROR: This action is not allowed for your account type.
+                </div>
             </div>
         </div>
 
         <!-- Form with Select and Dynamic Options -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Dynamic Select Form</h5>
+                <h5>Dynamic Select Form (With Error Cases)</h5>
             </div>
             <div class="card-body">
-                <form>
+                <form id="dynamicForm">
                     <div class="mb-3">
                         <label for="dynamicSelect" class="form-label">Dynamic Select</label>
                         <select class="form-select" id="dynamicSelect">
@@ -207,23 +471,73 @@
                             <option value="2">Option 2</option>
                             <option value="3">Option 3</option>
                         </select>
+                        <div id="selectError" class="error-message">
+                            Please select a valid option.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="dependentField" class="form-label">Dependent Field</label>
                         <input type="text" class="form-control" id="dependentField" placeholder="This appears after selecting Option 3" style="display: none;">
+                        <div id="dependentError" class="error-message">
+                            This field is required when Option 3 is selected.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="conditionalSelect" class="form-label">Conditional Select</label>
+                        <select class="form-select" id="conditionalSelect">
+                            <option selected>Select an option</option>
+                            <option value="a">Option A</option>
+                            <option value="b">Option B</option>
+                        </select>
+                        <div id="conditionalError" class="conditional-error">
+                            You must select Option B to proceed.
+                        </div>
                     </div>
                     <button type="button" class="btn btn-primary" id="updateSelectBtn">Update Select Options</button>
                     <button type="submit" class="btn btn-secondary">Submit</button>
+                    <button type="button" class="btn btn-danger" id="showDelayedErrorBtn">Show Delayed Error</button>
                 </form>
                 <script>
                     document.getElementById('dynamicSelect').addEventListener('change', function() {
                         const dependentField = document.getElementById('dependentField');
+                        const dependentError = document.getElementById('dependentError');
                         dependentField.style.display = this.value === '3' ? 'block' : 'none';
+                        dependentError.style.display = this.value === '3' ? 'block' : 'none';
+                    });
+
+                    document.getElementById('conditionalSelect').addEventListener('change', function() {
+                        const conditionalError = document.getElementById('conditionalError');
+                        conditionalError.style.display = this.value !== 'b' ? 'block' : 'none';
                     });
 
                     document.getElementById('updateSelectBtn').addEventListener('click', function() {
                         const select = document.getElementById('dynamicSelect');
-                        select.innerHTML = '<option selected>Updated Option 1</option><option>Updated Option 2</option>';
+                        select.innerHTML = '<option selected>Updated Option 1</option><option>Updated Option 2</option><option>Updated Option 3</option>';
+                        document.getElementById('selectError').style.display = 'block';
+                    });
+
+                    document.getElementById('dynamicForm').addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const dynamicSelect = document.getElementById('dynamicSelect').value;
+                        const conditionalSelect = document.getElementById('conditionalSelect').value;
+
+                        if (dynamicSelect === 'Select an option') {
+                            document.getElementById('selectError').style.display = 'block';
+                        } else {
+                            document.getElementById('selectError').style.display = 'none';
+                        }
+
+                        if (conditionalSelect !== 'b') {
+                            document.getElementById('conditionalError').style.display = 'block';
+                        } else {
+                            document.getElementById('conditionalError').style.display = 'none';
+                        }
+                    });
+
+                    document.getElementById('showDelayedErrorBtn').addEventListener('click', function() {
+                        setTimeout(() => {
+                            document.getElementById('delayedError').style.display = 'block';
+                        }, 2000);
                     });
                 </script>
             </div>
@@ -232,7 +546,7 @@
         <!-- Buttons with Various States -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Button States</h5>
+                <h5>Button States (With Error Cases)</h5>
             </div>
             <div class="card-body">
                 <button class="btn btn-primary btn-custom" id="normalButton">Normal Button</button>
@@ -240,13 +554,23 @@
                 <button class="btn btn-success btn-custom" id="jsButton">JS Button (Click Me)</button>
                 <button class="btn btn-danger btn-custom" id="errorButton">Simulate Error</button>
                 <button class="btn btn-warning btn-custom" id="slowButton">Slow Response (3s)</button>
+                <button class="btn btn-info btn-custom" id="conditionalButton">Conditional Button</button>
+                <div id="buttonError" class="error-message" style="display: none; margin-top: 10px;">
+                    ERROR: This action failed due to insufficient permissions.
+                </div>
+                <div id="buttonSuccess" class="success-message" style="display: none; margin-top: 10px;">
+                    Action completed successfully!
+                </div>
                 <script>
                     document.getElementById('jsButton').addEventListener('click', function() {
-                        alert('JavaScript button clicked!');
+                        document.getElementById('buttonSuccess').style.display = 'block';
+                        setTimeout(() => {
+                            document.getElementById('buttonSuccess').style.display = 'none';
+                        }, 2000);
                     });
 
                     document.getElementById('errorButton').addEventListener('click', function() {
-                        document.getElementById('simulatedError').style.display = 'block';
+                        document.getElementById('buttonError').style.display = 'block';
                     });
 
                     document.getElementById('slowButton').addEventListener('click', function() {
@@ -255,35 +579,55 @@
                         setTimeout(() => {
                             this.disabled = false;
                             this.textContent = 'Slow Response (3s)';
-                            alert('Slow response completed!');
+                            document.getElementById('buttonSuccess').style.display = 'block';
+                            setTimeout(() => {
+                                document.getElementById('buttonSuccess').style.display = 'none';
+                            }, 2000);
                         }, 3000);
                     });
+
+                    document.getElementById('conditionalButton').addEventListener('click', function() {
+                        // Show error 50% of the time
+                        if (Math.random() < 0.5) {
+                            document.getElementById('buttonError').style.display = 'block';
+                        } else {
+                            document.getElementById('buttonSuccess').style.display = 'block';
+                            setTimeout(() => {
+                                document.getElementById('buttonSuccess').style.display = 'none';
+                            }, 2000);
+                        }
+                    });
                 </script>
-                <div id="simulatedError" style="display: none; color: red; margin-top: 10px;">
-                    ERROR: This is a simulated error for the bot to detect!
-                </div>
             </div>
         </div>
 
         <!-- Known Bugs Section -->
         <div class="bug-section">
-            <h5>Known Bugs and Edge Cases</h5>
+            <h5>Known Bugs and Edge Cases for Testing</h5>
             <ul>
-                <li><strong>Validation Errors:</strong> Click "Show Validation Errors" to reveal hidden error messages.</li>
-                <li><strong>Hidden Field:</strong> Click "Toggle Hidden Field" to show/hide a field dynamically.</li>
+                <li><strong>Validation Errors:</strong> Click "Show Validation Errors" to reveal various error messages in red.</li>
+                <li><strong>Unusual System Errors:</strong> The unusual error message appears in a monospace font with a different background.</li>
+                <li><strong>Low Contrast Errors:</strong> Some errors have low contrast that might be hard to detect.</li>
+                <li><strong>Hidden Field Errors:</strong> Click "Toggle Hidden Field" to show/hide a field with its associated error.</li>
+                <li><strong>Overlay Errors:</strong> Click "Show Overlay" to display an overlay with potential error messages.</li>
+                <li><strong>Dynamic Overlay Errors:</strong> Click "Show Dynamic Error" to display an error followed by an overlay.</li>
+                <li><strong>Delayed Errors:</strong> Click "Show Delayed Error" to see an error that appears after a delay.</li>
+                <li><strong>Conditional Errors:</strong> Some errors only appear based on specific conditions (like selecting certain options).</li>
+                <li><strong>Hover Errors:</strong> Some errors only appear when hovering over elements.</li>
                 <li><strong>Broken Link:</strong> The "Broken Link (404)" in the dropdown menu leads nowhere.</li>
-                <li><strong>Hover Content:</strong> The "Hover over me" div reveals content only on hover (should not be visible to the bot unless it simulates hover).</li>
+                <li><strong>Error Link:</strong> The "Error Link" in the dropdown shows an error message when clicked.</li>
                 <li><strong>Invisible/Zero-sized Elements:</strong> These should not be visible or interactable.</li>
-                <li><strong>Dynamic Select:</strong> Selecting "Option 3" reveals a dependent field. The "Update Select Options" button changes the select options dynamically.</li>
-                <li><strong>Simulated Error:</strong> Click "Simulate Error" to show an error message.</li>
-                <li><strong>Slow Response:</strong> Click "Slow Response (3s)" to simulate a slow API call.</li>
+                <li><strong>Dynamic Select:</strong> Selecting "Option 3" reveals a dependent field with its own error.</li>
+                <li><strong>Conditional Select:</strong> Selecting anything other than "Option B" shows an error.</li>
+                <li><strong>Random Errors:</strong> Some actions have a random chance of showing errors.</li>
+                <li><strong>System-Level Errors:</strong> The unusual error simulates a system-level failure, not just validation.</li>
             </ul>
         </div>
 
         <!-- Accessibility Issues -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5>Accessibility Issues</h5>
+                <h5>Accessibility Issues (With Error Cases)</h5>
             </div>
             <div class="card-body">
                 <p>This section contains intentional accessibility issues for the bot to detect:</p>
@@ -295,6 +639,18 @@
                         <input type="text" class="form-control" placeholder="No label or ARIA"> <!-- Missing label -->
                     </div>
                 </form>
+                <div class="unusual-warning">
+                    <strong>WARNING:</strong> This section contains unusual error patterns that might be hard to detect:
+                    <ul>
+                        <li>Error messages that appear in non-standard locations</li>
+                        <li>Errors that only appear after specific sequences of actions</li>
+                        <li>Errors that are styled to look like normal content</li>
+                        <li>Errors that appear and disappear quickly</li>
+                        <li>Errors that are hidden behind other elements</li>
+                        <li>Errors that only appear in overlays</li>
+                        <li>Errors that change based on dynamic conditions</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>

@@ -53,6 +53,47 @@ class HTMLSimplifier:
                         return rect.width > 0 && rect.height > 0;
                     }
 
+                    function getComputedStyles(el) {
+                        const style = window.getComputedStyle(el);
+                        const importantStyles = {
+                            'color': style.color,
+                            'backgroundColor': style.backgroundColor,
+                            'zIndex': style.zIndex,
+                            'position': style.position,
+                            'width': style.width,
+                            'height': style.height,
+                            'fontSize': style.fontSize,
+                            'fontWeight': style.fontWeight,
+                            'border': style.border,
+                            'boxShadow': style.boxShadow,
+                            'opacity': style.opacity,
+                            'visibility': style.visibility,
+                            'display': style.display
+                        };
+
+                        // Check if color is red (common for error messages)
+                        const color = style.color;
+                        if (color) {
+                            const rgb = color.match(/\\d+/g);
+                            if (rgb && rgb.length >= 3) {
+                                const r = parseInt(rgb[0]);
+                                const g = parseInt(rgb[1]);
+                                const b = parseInt(rgb[2]);
+                                importantStyles.isRed = (r > 200 && g < 100 && b < 100);
+                            }
+                        }
+
+                        // Check if element is likely an overlay
+                        importantStyles.isOverlay = false;
+                        if (style.position === 'fixed' || style.position === 'absolute') {
+                            if (parseInt(style.zIndex) > 100) {
+                                importantStyles.isOverlay = true;
+                            }
+                        }
+
+                        return importantStyles;
+                    }
+
                     function cloneElementWithSemantics(el, targetParent) {
                         try {
                             if (!isElementVisible(el) || processedElements.has(el)) return false;
@@ -71,6 +112,14 @@ class HTMLSimplifier:
                                     }
                                 } catch (e) {
                                     continue;
+                                }
+                            }
+
+                            // Add computed styles as data attributes
+                            const computedStyles = getComputedStyles(el);
+                            for (const [key, value] of Object.entries(computedStyles)) {
+                                if (value !== '' && value !== 'auto' && value !== 'normal') {
+                                    clone.setAttribute(`data-computed-${key}`, value);
                                 }
                             }
 
