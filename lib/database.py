@@ -139,6 +139,9 @@ class Database:
         c.execute(script, (bot_id,))
         columns = [column[0] for column in c.description]
         bugs = [dict(zip(columns, row)) for row in c.fetchall()]
+        for bug in bugs:
+            if bug.get('steps'):
+                bug['steps'] = json.loads(bug['steps'])
         conn.close()
         return bugs
 
