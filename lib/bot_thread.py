@@ -176,7 +176,7 @@ class BotThread(threading.Thread):
 
         diff = list(difflib.unified_diff(before_lines, after_lines, n=0))
 
-        if len(diff) < len(after_lines) * 0.7:
+        if len(diff) < len(after_lines) * 0.7 and len(diff) > 0:
             return "\n".join(diff)
         else:
             return after_html
