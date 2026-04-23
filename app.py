@@ -91,7 +91,7 @@ def bot(bot_id):
     bot = db.get_bot(bot_id)
     steps = db.get_steps(bot_id)
     bugs = db.get_bugs(bot_id)
-    return render_template('bot.html', bot=bot, steps=steps, bugs=bugs)
+    return render_template('bot.html', bot=bot, steps=steps, bugs=bugs, db=db)
 
 @app.route('/bugs')
 def bugs():
