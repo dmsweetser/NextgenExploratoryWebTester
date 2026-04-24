@@ -145,6 +145,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>Summary</th>
+                        <th>Severity</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -173,6 +174,11 @@
                                     </div>
                                 </div>
                             </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if bug['severity'] == 'high' %}danger{% elif bug['severity'] == 'medium' %}warning{% else %}secondary{% endif %}">
+                                {{ bug['severity'] }}
+                            </span>
                         </td>
                         <td>
                             <a href="{{ url_for('export_bug', bug_id=bug['id']) }}"

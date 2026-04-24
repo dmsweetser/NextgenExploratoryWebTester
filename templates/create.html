@@ -28,6 +28,28 @@
                     <textarea class="form-control" id="directive" name="directive" rows="5" required placeholder="Example: Test the login functionality thoroughly. Try edge cases like empty fields, special characters, and very long inputs. Attempt to bypass validation if possible."></textarea>
                     <div class="form-text">Describe what the NEWT bot should test and what it should look for. Include specific edge cases and unusual scenarios. Line breaks will be preserved.</div>
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Bug Detection Categories</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="typos" id="cat_typos" name="bug_categories" checked>
+                        <label class="form-check-label" for="cat_typos">Typos</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="ux_failure" id="cat_ux_failure" name="bug_categories" checked>
+                        <label class="form-check-label" for="cat_ux_failure">UX Failures (Confusing flows, logical errors)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="app_crash" id="cat_app_crash" name="bug_categories" checked>
+                        <label class="form-check-label" for="cat_app_crash">App Crashes/Failures</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="security" id="cat_security" name="bug_categories">
+                        <label class="form-check-label" for="cat_security">Security Vulnerabilities</label>
+                    </div>
+                    <div class="form-text">Select which types of bugs the bot should look for. Interactivity issues are always ignored.</div>
+                </div>
+
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-robot"></i> Create and Start NEWT Bot
                 </button>

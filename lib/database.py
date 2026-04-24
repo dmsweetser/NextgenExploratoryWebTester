@@ -37,6 +37,7 @@ class Database:
                       summary TEXT,
                       steps TEXT,
                       status TEXT DEFAULT 'new',
+                      severity TEXT,
                       reported_at TEXT,
                       resolved_at TEXT,
                       FOREIGN KEY(bot_id) REFERENCES bots(id))''')
@@ -119,11 +120,11 @@ class Database:
         conn.close()
         return steps
 
-    def add_bug(self, bot_id, summary, steps, status='new'):
+    def add_bug(self, bot_id, summary, steps, status='new', severity='medium'):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
-        c.execute("INSERT INTO bugs (bot_id, summary, steps, status, reported_at) VALUES (?, ?, ?, ?, ?)",
-                 (bot_id, summary, steps, status, datetime.now().isoformat()))
+        c.execute("INSERT INTO bugs (bot_id, summary, steps, status, severity, reported_at) VALUES (?, ?, ?, ?, ?, ?)",
+                 (bot_id, summary, steps, status, severity, datetime.now().isoformat()))
         conn.commit()
         bug_id = c.lastrowid
         conn.close()
@@ -159,6 +160,9 @@ class Database:
         c.execute("SELECT b.*, bt.name as bot_name FROM bugs b JOIN bots bt ON b.bot_id = bt.id ORDER BY b.id DESC")
         columns = [column[0] for column in c.description]
         bugs = [dict(zip(columns, row)) for row in c.fetchall()]
+        for bug in bugs:
+            if bug.get('severity') is None:
+                bug['severity'] = 'medium'
         conn.close()
         return bugs
 
@@ -170,6 +174,8 @@ class Database:
         row = c.fetchone()
         if row:
             bug = dict(zip(columns, row))
+            if bug.get('severity') is None:
+                bug['severity'] = 'medium'
         else:
             bug = None
         conn.close()
@@ -183,6 +189,10 @@ class Database:
         conn.commit()
         conn.close()
 
+    def update_bug_status_to_resolved(self, bug_id):
+        """Alias for resolve_bug to be used by bot_thread for auto-removal"""
+        self.resolve_bug(bug_id)
+        
     def add_knowledge(self, bug_id, knowledge_text):
         conn = sqlite3.connect('data/bots.db')
         c = conn.cursor()
