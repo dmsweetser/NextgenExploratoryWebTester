@@ -570,56 +570,66 @@ THAT'S AN ORDER, SOLDIER!
         current_html = self.html_simplifier.simplify_html(self.html_simplifier.get_visible_html(self.driver))
         html_diff = self.get_html_diff(self.previous_html, current_html)
 
+        # Get configured bug categories
+        categories_str = Config.get_bug_categories()
+        if categories_str:
+            categories = [c.strip() for c in categories_str.split(',')]
+        else:
+            categories = ['typos', 'ux_failure', 'app_crash', 'security']
+
+        category_list = ", ".join(categories)
+
         newt_operation_summary = """
 NEWT BUG DETECTION SUMMARY:
-You are analyzing page changes to detect REAL, FUNCTIONAL bugs that impact end users. Your goal is to:
-1. Identify ONLY genuine malfunctions that would impact real users
-2. Focus on confirmed functional issues, not speculative problems
-3. Consider the full context of actions taken and their outcomes
-4. Avoid false positives from simplified HTML or temporary states
-5. Require multiple confirming observations before reporting a bug
-6. IGNORE test apparatus limitations and focus on REAL user impact
+You are analyzing page changes to detect SPECIFIC TYPES OF bugs defined by the user. Your goal is to:
+1. Identify ONLY bugs from the allowed categories: {categories}
+2. IGNORE all other types of issues, including interactivity failures, test apparatus limitations, and minor visual glitches.
+3. Focus on confirmed issues that match the specific categories above.
+4. Consider the full context of actions taken and their outcomes.
+5. Avoid false positives from simplified HTML or temporary states.
+6. Require multiple confirming observations before reporting a bug.
 
 IMPORTANT NOTES ABOUT THE HTML YOU RECEIVE:
-- The HTML is SIMPLIFIED to remove noise and focus on semantic content
-- Styles, scripts, and non-essential attributes are intentionally removed
-- Hidden elements (display:none, visibility:hidden) are removed
-- This helps you focus on functionality, not presentation
-- Missing styles or layout issues are NOT bugs
-- Focus ONLY on confirmed functional issues that impact end users
+- The HTML is SIMPLIFIED to remove noise and focus on semantic content.
+- Styles, scripts, and non-essential attributes are intentionally removed.
+- Hidden elements (display:none, visibility:hidden) are removed.
+- This helps you focus on functionality, not presentation.
+- Missing styles or layout issues are NOT bugs.
+- Focus ONLY on the specific bug categories listed above.
 
 CRITICAL BUG DETECTION RULES:
-1. YOU MUST NOT report a bug based solely on HTML appearance
-2. YOU MUST confirm any suspected issue through multiple observations
-3. YOU MUST consider the full sequence of actions leading to the state
-4. YOU MUST verify that any "blocking" is actually preventing functionality for end users
-5. YOU MUST check if the issue persists after trying alternative approaches
-6. YOU MUST NOT report issues that could be resolved by further interaction
-7. YOU MUST prioritize bugs that would genuinely impact end users
-8. YOU MUST IGNORE test apparatus limitations (e.g., "element not interactable" unless confirmed as a real issue)
-9. YOU MUST focus on functional issues that prevent task completion
+1. YOU MUST NOT report a bug based solely on HTML appearance.
+2. YOU MUST confirm any suspected issue through multiple observations.
+3. YOU MUST consider the full sequence of actions leading to the state.
+4. YOU MUST verify that any "blocking" is actually preventing functionality for end users.
+5. YOU MUST check if the issue persists after trying alternative approaches.
+6. YOU MUST NOT report issues that could be resolved by further interaction.
+7. YOU MUST prioritize bugs that fall into the specific categories: {categories}.
+8. YOU MUST IGNORE test apparatus limitations (e.g., "element not interactable" unless confirmed as a real issue in the target categories).
+9. YOU MUST focus on functional issues that prevent task completion.
 
-SPECIFIC GUIDELINES FOR REAL BUGS:
-- Functional issues that prevent task completion
-- Logical inconsistencies in application behavior
-- Data corruption or loss
-- Security vulnerabilities
-- Accessibility issues that prevent usage
-- Unexpected behavior that would confuse users
-- Broken functionality that persists across multiple attempts
+SPECIFIC GUIDELINES FOR REAL BUGS (Categories: {categories}):
+- Typos: Incorrect or misspelled text that indicates problems.
+- UX Failures: Logical inconsistencies, confusing flows, or unexpected behaviors that confuse users.
+- App Crashes: Application failures, exceptions, or unexpected page states.
 
 SPECIFIC GUIDELINES FOR WHAT TO IGNORE:
-- Visual styling issues
-- Missing classes or attributes in simplified HTML
-- Temporary loading states
-- Issues that could be resolved by further interaction
-- Test apparatus limitations
-- "Element not interactable" unless confirmed as a real user-facing issue
-- Overlays or popups that are part of normal application flow
+- Visual styling issues.
+- Missing classes or attributes in simplified HTML.
+- Temporary loading states.
+- Issues that could be resolved by further interaction.
+- Test apparatus limitations.
+- "Element not interactable" unless confirmed as a real user-facing issue.
+- Overlays or popups that are part of normal application flow.
+- Any bug type NOT listed in the allowed categories.
 """
 
+        # Prepare known bugs for removal check
+        known_bugs = self.db.get_bugs(self.bot_id, False)
+        known_bugs_text = json.dumps(known_bugs, indent=2) if known_bugs else "None"
+
         prompt = f"""
-{newt_operation_summary}
+{newt_operation_summary.format(categories=category_list)}
 
 Current directive: {self.directive}
 
@@ -632,8 +642,8 @@ Page HTML AFTER the most recent action (simplified):
 Steps taken (with success/failure status):
 {self.get_step_text()}
 
-Known bugs:
-{json.dumps(self.db.get_bugs(self.bot_id, False))}
+Known bugs currently in the system:
+{known_bugs_text}
 
 {f"You previously requested these select options:{chr(10) + json.dumps(self.select_options_cache)}" if len(self.select_options_cache) == 1 else '' }
 
@@ -651,14 +661,16 @@ CRITICAL BUG DETECTION QUESTIONS YOU MUST ANSWER:
 6. Have you confirmed this isn't already a known bug?
 7. Does this issue prevent completion of the testing directive for a real user?
 8. Is this a REAL, FUNCTIONAL issue that impacts end users, or just a test apparatus limitation?
+9. Does this bug fall into one of the allowed categories: {category_list}?
 
 BUG REPORTING REQUIREMENTS:
-- You MUST provide specific, reproducible steps that demonstrate the bug
-- You MUST explain why this is a functional issue that impacts end users
-- You MUST confirm the issue affects end users, not just the testing process
-- You MUST NOT report issues that could be resolved by further interaction
-- You MUST NOT report test apparatus limitations
-- You MUST focus on REAL, FUNCTIONAL bugs that impact end users
+- You MUST provide specific, reproducible steps that demonstrate the bug.
+- You MUST explain why this is a functional issue that impacts end users.
+- You MUST confirm the issue affects end users, not just the testing process.
+- You MUST NOT report issues that could be resolved by further interaction.
+- You MUST NOT report test apparatus limitations.
+- You MUST focus on REAL, FUNCTIONAL bugs that impact end users.
+- You MUST ONLY report bugs from the allowed categories: {category_list}.
 
 Respond ONLY with the following:
 
@@ -687,6 +699,9 @@ Explain how you confirmed this bug through multiple observations or alternative 
 ~newt_impact_start~
 Explain specifically how this bug impacts end users and prevents them from completing their tasks
 ~newt_impact_end~
+~newt_remove_bug_ids_start~
+Comma-separated list of existing bug IDs that are no longer relevant or have been resolved. If none, leave empty.
+~newt_remove_bug_ids_end~
 ```
         """
 
@@ -714,7 +729,17 @@ Explain specifically how this bug impacts end users and prevents them from compl
                 "recommendation": extract_line_based_content(analysis, "~newt_recommendation_start~", "~newt_recommendation_end~"),
                 "confirmation": extract_line_based_content(analysis, "~newt_confirmation_start~", "~newt_confirmation_end~"),
                 "impact": extract_line_based_content(analysis, "~newt_impact_start~", "~newt_impact_end~"),
+                "remove_bug_ids": extract_line_based_content(analysis, "~newt_remove_bug_ids_start~", "~newt_remove_bug_ids_end~").strip()
             }
+
+            # Parse remove_bug_ids into a list
+            if analysis_object["remove_bug_ids"]:
+                try:
+                    analysis_object["remove_bug_ids"] = [int(x.strip()) for x in analysis_object["remove_bug_ids"].split(',') if x.strip().isdigit()]
+                except:
+                    analysis_object["remove_bug_ids"] = []
+            else:
+                analysis_object["remove_bug_ids"] = []
 
             # Only return True if the bug is confirmed through multiple observations and is a REAL issue
             if analysis_object["is_bug"]:
@@ -737,16 +762,22 @@ Explain specifically how this bug impacts end users and prevents them from compl
         steps = json.dumps(context['steps_taken'])
 
         try:
-            bug_id = self.db.add_bug(self.bot_id, summary, steps)
+            severity = analysis.get('severity', 'medium').lower()
+            if severity not in ['high', 'medium', 'low']:
+                severity = 'medium'
+
+            bug_id = self.db.add_bug(self.bot_id, summary, steps, severity=severity)
             knowledge = f"DESCRIPTION:{chr(10)}{analysis['description']}{chr(10)}{chr(10)}"
             knowledge += f"RECOMMENDATION:{chr(10)}{analysis['recommendation']}{chr(10)}{chr(10)}"
             knowledge += f"CONFIRMATION:{chr(10)}{analysis['confirmation']}{chr(10)}{chr(10)}"
             knowledge += f"IMPACT ON USERS:{chr(10)}{analysis['impact']}"
             self.db.add_knowledge(bug_id, knowledge)
 
-            severity = analysis.get('severity', 'medium').lower()
-            if severity not in ['high', 'medium', 'low']:
-                severity = 'medium'
+            # Handle removal of existing bugs if requested
+            if analysis.get('remove_bug_ids'):
+                for bug_id_to_remove in analysis['remove_bug_ids']:
+                    self.logger.info(f"Bot {self.bot_id} - Removing bug {bug_id_to_remove} as per LLM request")
+                    self.db.update_bug_status_to_resolved(bug_id_to_remove)
 
             self.bug_reporter.send_notification(summary, knowledge, severity)
             return bug_id

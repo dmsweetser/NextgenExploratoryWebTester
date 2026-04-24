@@ -127,3 +127,7 @@ class Config:
     @classmethod
     def get_max_diff_lines(cls) -> int:
         return int(os.getenv('MAX_DIFF_LINES', '10'))
+
+    @classmethod
+    def get_bug_categories(cls) -> str:
+        return os.getenv('BUG_CATEGORIES', 'typos,ux_failure,app_crash,security').lower()

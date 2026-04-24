@@ -17,6 +17,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Summary</th>
+                        <th>Severity</th>
                         <th>NEWT Bot</th>
                         <th>Status</th>
                         <th>Reported</th>
@@ -29,6 +30,11 @@
                     <tr>
                         <td>#{{ bug['id'] }}</td>
                         <td><div style="white-space: pre-wrap;">{{ bug['summary'] }}</div></td>
+                        <td>
+                            <span class="badge bg-{% if bug['severity'] == 'high' %}danger{% elif bug['severity'] == 'medium' %}warning{% else %}secondary{% endif %}">
+                                {{ bug['severity'] }}
+                            </span>
+                        </td>
                         <td>{{ bug['bot_name'] }}</td>
                         <td>
                             <span

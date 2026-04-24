@@ -55,6 +55,7 @@ def create_bot():
         name = request.form['name']
         start_url = request.form['start_url']
         directive = request.form['directive']
+        bug_categories = request.form.get('bug_categories', 'typos,ux_failure,app_crash')
 
         # Validate start URL
         try:
@@ -64,6 +65,9 @@ def create_bot():
                 return render_template('create.html', error="Please enter a valid URL with http:// or https://")
         except:
             return render_template('create.html', error="Please enter a valid URL")
+
+        # Set the bug categories in the config for this session
+        os.environ['BUG_CATEGORIES'] = bug_categories
 
         bot_id = db.create_bot(name, start_url, directive)
         bot_thread = BotThread(
@@ -84,7 +88,7 @@ def create_bot():
 
         return redirect(url_for('bot', bot_id=bot_id))
 
-    return render_template('create.html')
+    return render_template('create.html', bug_categories=Config.get_bug_categories())
 
 @app.route('/bot/<int:bot_id>')
 def bot(bot_id):
