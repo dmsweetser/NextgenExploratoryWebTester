@@ -1,3 +1,5 @@
+import json
+
 from lib.stages.base_stage import BaseStage
 from lib.llm_integration import extract_line_based_content
 
