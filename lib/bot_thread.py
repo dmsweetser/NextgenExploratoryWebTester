@@ -131,7 +131,7 @@ class BotThread(threading.Thread):
         # Use the revised description if available
         description = bug_validation_result.get('revised_description', bug_detection_result.get('description', ''))
 
-        summary = f"NEWT Bug Detected: {description[:100]}..."
+        summary = f"NEWT Bug Detected: {description}..."
         steps = json.dumps(context.get('steps_taken', []))
 
         try:
